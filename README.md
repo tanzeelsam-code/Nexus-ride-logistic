@@ -39,7 +39,11 @@ not deployed by this command. API requests return an explicit 503 until a
 backend is connected. The dashboard labels sample data and blocks backend
 actions while offline.
 
-Workers Builds settings:
+Python dependencies are in `ai/requirements.txt` so Workers Builds does not
+automatically install PyTorch. For the AI service, use
+`pip install -r ai/requirements.txt` or `Dockerfile.ai`.
+
+Optional Workers Builds settings:
 
 - Root directory: `/`
 - Build variable: `SKIP_DEPENDENCY_INSTALL=true`
