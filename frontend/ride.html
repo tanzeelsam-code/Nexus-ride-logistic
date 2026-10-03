@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS RIDE — Taxi Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+
+/* ═══════════════════════════════════════════════════
+   NEXUS RIDE — ELECTRIC BLUE / DARK THEME
+   Identity: Fast, sleek, urban mobility
+═══════════════════════════════════════════════════ */
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --void:#03050a;
+  --dark:#080d18;
+  --dark2:#0d1526;
+  --dark3:#131d35;
+  --border:rgba(255,255,255,0.07);
+  --border2:rgba(255,255,255,0.13);
+
+  --ride:#00d4ff;        /* Electric cyan — NEXUS RIDE brand */
+  --ride2:#0099ff;
+  --ride-glow:rgba(0,212,255,0.18);
+  --amber:#ffb547;
+  --emerald:#00ff88;
+  --rose:#ff4466;
+  --lavender:#b388ff;
+
+  --txt:#dde6f5;
+  --txt2:#6b7fa3;
+  --txt3:#2e3d5a;
+
+  --mono:'Space Mono',monospace;
+  --sans:'Space Grotesk',sans-serif;
+  --r:14px;
+}
+
+html,body{height:100%;background:var(--void);color:var(--txt);font-family:var(--sans);overflow:hidden;cursor:default;}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* ─── GRAIN OVERLAY ─── */
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:0;opacity:.6;
+}
+
+/* ─── ROOT LAYOUT ─── */
+.root{display:grid;grid-template-columns:230px 1fr 320px;grid-template-rows:60px 1fr;height:100vh;position:relative;z-index:1;}
+
+/* ═══ TOPBAR ═════════════════════════════════════════ */
+.topbar{
+  grid-column:1/-1;
+  background:rgba(8,13,24,0.95);
+  backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:0;
+  padding:0 20px;z-index:100;
+}
+
+.brand{
+  display:flex;align-items:center;gap:10px;
+  padding:0 20px 0 0;
+  border-right:1px solid var(--border);
+  margin-right:20px;
+}
+
+.brand-mark{
+  width:32px;height:32px;border-radius:8px;
+  background:linear-gradient(135deg,var(--ride),var(--ride2));
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;box-shadow:0 0 20px var(--ride-glow);
+  animation:brandPulse 3s ease-in-out infinite;
+}
+
+@keyframes brandPulse{0%,100%{box-shadow:0 0 20px var(--ride-glow)}50%{box-shadow:0 0 35px rgba(0,212,255,0.35)}}
+
+.brand-name{font-size:16px;font-weight:700;letter-spacing:.01em}
+.brand-name em{font-style:normal;color:var(--ride)}
+.brand-tag{font-size:9px;color:var(--txt3);font-family:var(--mono);letter-spacing:.12em;text-transform:uppercase}
+
+.top-pills{display:flex;gap:12px;flex:1}
+.pill{
+  display:flex;align-items:center;gap:7px;
+  background:var(--dark2);border:1px solid var(--border);
+  border-radius:100px;padding:5px 14px;
+  font-size:11px;font-family:var(--mono);color:var(--txt2);
+}
+.pill .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.dot-green{background:var(--emerald);box-shadow:0 0 8px var(--emerald);animation:blink 2s infinite}
+.dot-amber{background:var(--amber);box-shadow:0 0 8px var(--amber);animation:blink 1.5s infinite}
+.dot-red{background:var(--rose);box-shadow:0 0 8px var(--rose);animation:blink 1s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+.top-time{font-family:var(--mono);font-size:13px;color:var(--txt2);margin-left:auto}
+
+.div-switcher{
+  display:flex;gap:6px;margin-left:16px;padding-left:16px;border-left:1px solid var(--border);
+}
+.div-btn{
+  padding:6px 14px;border-radius:8px;font-size:11px;font-weight:700;
+  border:1px solid var(--border);cursor:pointer;transition:all .15s;
+  font-family:var(--sans);
+}
+.div-btn.ride{background:rgba(0,212,255,0.12);color:var(--ride);border-color:rgba(0,212,255,0.3);}
+.div-btn.freight{background:transparent;color:var(--txt2);}
+.div-btn.freight:hover{background:rgba(255,165,0,0.08);color:#ffa500;border-color:rgba(255,165,0,0.2);}
+
+/* ═══ SIDEBAR ════════════════════════════════════════ */
+.sidebar{
+  background:var(--dark);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  padding:16px 0;overflow-y:auto;
+}
+
+.s-section{
+  padding:10px 16px 4px;
+  font-size:9px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--txt3);font-family:var(--mono);
+}
+
+.s-item{
+  display:flex;align-items:center;gap:11px;
+  padding:9px 16px;margin:1px 8px;
+  border-radius:10px;cursor:pointer;
+  font-size:13px;font-weight:500;color:var(--txt2);
+  transition:all .15s;position:relative;
+}
+.s-item:hover{background:var(--dark2);color:var(--txt)}
+.s-item.on{background:rgba(0,212,255,0.09);color:var(--ride)}
+.s-item.on::after{
+  content:'';position:absolute;left:-8px;top:25%;bottom:25%;
+  width:3px;border-radius:0 3px 3px 0;
+  background:var(--ride);box-shadow:0 0 10px var(--ride);
+}
+.s-ico{font-size:15px;width:20px;text-align:center}
+.s-badge{
+  margin-left:auto;padding:1px 7px;border-radius:8px;
+  font-size:9px;font-weight:700;font-family:var(--mono);
+}
+.sb-cyan{background:rgba(0,212,255,0.15);color:var(--ride)}
+.sb-rose{background:rgba(255,68,102,0.15);color:var(--rose)}
+.sb-amber{background:rgba(255,181,71,0.15);color:var(--amber)}
+
+.ai-brain{
+  margin:auto 12px 0;
+  background:linear-gradient(135deg,rgba(0,212,255,0.07),rgba(179,136,255,0.07));
+  border:1px solid rgba(0,212,255,0.12);
+  border-radius:12px;padding:14px;
+}
+.ai-brain-title{
+  font-size:9px;font-family:var(--mono);letter-spacing:.1em;
+  color:var(--ride);margin-bottom:10px;
+  display:flex;align-items:center;gap:6px;
+}
+.ai-brain-title::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--ride);box-shadow:0 0 8px var(--ride);animation:blink 2s infinite}
+.ai-row{display:flex;justify-content:space-between;margin-bottom:5px;font-size:11px}
+.ai-row span:first-child{color:var(--txt2)}
+.ai-val{font-family:var(--mono);font-size:12px}
+
+/* ═══ MAIN CENTER ════════════════════════════════════ */
+.center{overflow-y:auto;display:flex;flex-direction:column;gap:16px;padding:18px}
+
+/* ─── PAGE HEADER ─── */
+.pg-head{display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0}
+.pg-title{font-size:20px;font-weight:700;letter-spacing:-.02em}
+.pg-sub{font-size:11px;color:var(--txt3);font-family:var(--mono);margin-top:2px}
+.hd-right{display:flex;gap:8px}
+.btn{display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:9px;border:none;cursor:pointer;font-family:var(--sans);font-size:12px;font-weight:600;transition:all .15s}
+.btn-outline{background:var(--dark2);color:var(--txt2);border:1px solid var(--border2)}
+.btn-outline:hover{background:var(--dark3);color:var(--txt)}
+.btn-ride{background:var(--ride);color:var(--void)}
+.btn-ride:hover{box-shadow:0 4px 20px rgba(0,212,255,0.35);transform:translateY(-1px)}
+
+/* ─── KPI ROW ─── */
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;flex-shrink:0}
+.kpi{
+  background:var(--dark);border:1px solid var(--border);
+  border-radius:var(--r);padding:16px;
+  position:relative;overflow:hidden;transition:border-color .2s;
+}
+.kpi:hover{border-color:var(--border2)}
+.kpi::after{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:var(--kc,var(--ride));
+}
+.kpi-ico{position:absolute;top:12px;right:12px;font-size:20px;opacity:.35}
+.kpi-lbl{font-size:9px;color:var(--txt3);font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+.kpi-val{font-size:24px;font-weight:700;letter-spacing:-.03em;line-height:1}
+.kpi-sub{font-size:10px;color:var(--txt2);margin-top:5px;font-family:var(--mono)}
+.up{color:var(--emerald)}.dn{color:var(--rose)}
+
+/* ─── GRID ─── */
+.grid-main{display:grid;grid-template-columns:1fr 1fr;gap:14px;flex-shrink:0}
+.grid-bottom{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;flex-shrink:0}
+
+.card{background:var(--dark);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:1px solid var(--border)}
+.card-title{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
+.card-body{padding:14px 16px;overflow-y:auto}
+
+/* ─── MAP ─── */
+.map-wrap{position:relative;height:220px;background:var(--dark2)}
+.map-svg{width:100%;height:100%}
+
+/* ─── VEHICLE TYPE STATS ─── */
+.vtype-row{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+.vtype-ico{font-size:20px;width:36px;height:36px;background:var(--dark2);border-radius:8px;display:flex;align-items:center;justify-content:center}
+.vtype-bar-wrap{flex:1}
+.vtype-name{font-size:12px;font-weight:500;margin-bottom:3px;display:flex;justify-content:space-between}
+.vtype-bar{height:5px;background:var(--dark3);border-radius:3px;overflow:hidden}
+.vtype-fill{height:100%;border-radius:3px;transition:width 1s ease}
+
+/* ─── LIVE TRIPS ─── */
+.trip-card{
+  background:var(--dark2);border-radius:10px;border:1px solid var(--border);
+  padding:12px;margin-bottom:8px;cursor:pointer;transition:all .15s;
+}
+.trip-card:hover{border-color:var(--border2);transform:translateX(2px)}
+.tc-top{display:flex;justify-content:space-between;margin-bottom:7px}
+.tc-id{font-family:var(--mono);font-size:10px;color:var(--ride)}
+.tc-status{font-size:9px;font-family:var(--mono);padding:2px 8px;border-radius:6px;font-weight:700;text-transform:uppercase}
+.s-live{background:rgba(0,212,255,.12);color:var(--ride)}
+.s-coming{background:rgba(255,181,71,.12);color:var(--amber)}
+.s-searching{background:rgba(179,136,255,.12);color:var(--lavender)}
+.s-done{background:rgba(0,255,136,.1);color:var(--emerald)}
+.s-cancel{background:rgba(255,68,102,.1);color:var(--rose)}
+.tc-route{font-size:11px;color:var(--txt2);display:flex;flex-direction:column;gap:3px}
+.tc-from{display:flex;align-items:center;gap:7px;color:var(--txt)}
+.tc-to{display:flex;align-items:center;gap:7px}
+.rt-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.tc-meta{display:flex;justify-content:space-between;margin-top:8px;font-size:10px;font-family:var(--mono);color:var(--txt2)}
+.tc-fare{color:var(--txt);font-weight:700}
+
+/* ─── CHART BARS ─── */
+.chart-bars{display:flex;align-items:flex-end;gap:5px;height:100px}
+.cb{flex:1;border-radius:4px 4px 0 0;cursor:pointer;position:relative;min-height:4px;transition:opacity .15s}
+.cb:hover{opacity:.8}
+.cb::after{content:attr(data-v);position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:9px;font-family:var(--mono);color:var(--txt2);white-space:nowrap;opacity:0;transition:.15s}
+.cb:hover::after{opacity:1}
+.chart-labels{display:flex;gap:5px;margin-top:6px}
+.cl{flex:1;text-align:center;font-size:8px;font-family:var(--mono);color:var(--txt3)}
+
+/* ─── SURGE MAP ─── */
+.surge-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.surge-z{
+  background:var(--dark2);border-radius:10px;padding:12px;
+  text-align:center;border:1px solid var(--border);
+  position:relative;overflow:hidden;
+}
+.sz-fill{position:absolute;inset:0;border-radius:10px;opacity:.12}
+.sz-mult{font-size:22px;font-weight:700;font-family:var(--mono);position:relative}
+.sz-name{font-size:10px;color:var(--txt2);margin-top:2px;position:relative}
+.sz-demand{font-size:9px;font-family:var(--mono);margin-top:4px;position:relative}
+
+/* ─── DRIVER LEADERBOARD ─── */
+.lb-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+.lb-row:last-child{border-bottom:none}
+.lb-rank{font-family:var(--mono);font-size:12px;color:var(--txt3);width:18px}
+.lb-av{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.lb-info{flex:1}
+.lb-name{font-size:12px;font-weight:600}
+.lb-type{font-size:10px;color:var(--txt3);font-family:var(--mono)}
+.lb-nums{text-align:right;font-family:var(--mono)}
+.lb-earn{font-size:12px;color:var(--emerald)}
+.lb-trips{font-size:10px;color:var(--txt2)}
+
+/* ═══ RIGHT PANEL ════════════════════════════════════ */
+.right-panel{
+  background:var(--dark);border-left:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.rp-head{padding:14px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+.rp-title{font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+
+.tabs2{display:flex;background:var(--dark2);border-radius:9px;padding:3px;gap:3px;margin-bottom:12px}
+.tab2{flex:1;text-align:center;padding:6px;border-radius:7px;cursor:pointer;font-size:11px;font-weight:600;color:var(--txt2);transition:.15s}
+.tab2.on{background:var(--dark3);color:var(--txt)}
+
+.rp-body{flex:1;overflow-y:auto;padding:0 14px 14px}
+
+/* Dispatch queue item */
+.dq-item{
+  background:var(--dark2);border-radius:10px;border:1px solid var(--border);
+  padding:12px;margin-bottom:8px;cursor:pointer;transition:all .15s;
+}
+.dq-item:hover{border-color:rgba(0,212,255,.25)}
+.dq-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.dq-id{font-family:var(--mono);font-size:10px;color:var(--ride)}
+.dq-wait{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:6px;background:rgba(255,181,71,.12);color:var(--amber)}
+.dq-route{font-size:11px;color:var(--txt2);margin-bottom:6px}
+.dq-ai{display:flex;align-items:center;gap:6px;font-size:10px;font-family:var(--mono);color:var(--txt3)}
+.dq-ai-bar{flex:1;height:3px;background:var(--dark3);border-radius:2px;overflow:hidden}
+.dq-ai-fill{height:100%;background:var(--ride);border-radius:2px;box-shadow:0 0 6px var(--ride)}
+.dq-actions{display:flex;gap:6px;margin-top:8px}
+.dq-btn{flex:1;padding:6px;border-radius:7px;border:none;cursor:pointer;font-size:10px;font-weight:700;font-family:var(--sans);transition:.15s}
+.dq-assign{background:rgba(0,212,255,.12);color:var(--ride)}
+.dq-assign:hover{background:rgba(0,212,255,.2)}
+.dq-skip{background:var(--dark3);color:var(--txt2)}
+.dq-skip:hover{background:rgba(255,68,102,.1);color:var(--rose)}
+
+/* Alert item */
+.al-item{
+  border-radius:10px;padding:11px;margin-bottom:8px;
+  display:flex;gap:10px;font-size:11px;border:1px solid;
+}
+.al-crit{background:rgba(255,68,102,.06);border-color:rgba(255,68,102,.2)}
+.al-warn{background:rgba(255,181,71,.06);border-color:rgba(255,181,71,.2)}
+.al-info{background:rgba(0,212,255,.04);border-color:rgba(0,212,255,.1)}
+.al-ico{font-size:16px;flex-shrink:0}
+.al-title{font-weight:700;margin-bottom:2px}
+.al-desc{color:var(--txt2);line-height:1.4;font-size:10px}
+.al-time{font-family:var(--mono);font-size:9px;color:var(--txt3);margin-top:4px}
+
+/* Notification dot */
+.notif-dot{position:relative;display:inline-block}
+.notif-dot::after{content:'';position:absolute;top:-1px;right:-1px;width:7px;height:7px;border-radius:50%;background:var(--rose);box-shadow:0 0 6px var(--rose)}
+
+/* ─── ANIMATIONS ─── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.fade-up{animation:fadeUp .35s ease forwards}
+.delay1{animation-delay:.05s}.delay2{animation-delay:.1s}.delay3{animation-delay:.15s}
+
+</style>
+</head>
+<body>
+<div class="root">
+
+  <!-- ══ TOPBAR ═══════════════════════════════════════════ -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">🚕</div>
+      <div>
+        <div class="brand-name">NEXUS<em> RIDE</em></div>
+        <div class="brand-tag">Taxi Division</div>
+      </div>
+    </div>
+
+    <div class="top-pills">
+      <div class="pill"><div class="dot dot-green"></div>AI Dispatch LIVE</div>
+      <div class="pill"><div class="dot dot-amber"></div>Queue: <strong id="q-count" style="color:var(--amber);margin-left:4px">14</strong></div>
+      <div class="pill"><div class="dot dot-green"></div>All Systems Operational</div>
+    </div>
+
+    <div class="top-time" id="clock">—</div>
+
+    <div class="div-switcher">
+      <div class="div-btn ride">🚕 NEXUS RIDE</div>
+      <div class="div-btn freight" onclick="window.location.href='freight.html'">📦 NEXUS FREIGHT →</div>
+    </div>
+  </header>
+
+  <!-- ══ SIDEBAR ══════════════════════════════════════════ -->
+  <nav class="sidebar">
+    <div class="s-section">OPERATIONS</div>
+    <div class="s-item on" onclick="setNav(this)"><span class="s-ico">⚡</span>Command Center</div>
+    <div class="s-item" onclick="setNav(this)"><span class="s-ico">🗺️</span>Live Fleet Map</div>
+    <div class="s-item" onclick="setNav(this)"><span class="s-ico">🚖</span>Active Trips<span class="s-badge sb-cyan" id="sb-trips">32</span></div>
+    <div class="s-item" onclick="setNav(this)"><span class="s-ico">📋</span>Dispatch Queue<span class="s-badge sb-amber" id="sb-queue">14</span></div>
+    <div class="s-item" onclick="setNav(this)"><span class="s-ico">⚡</span>Surge Zones</div>
+
+    <div class="s-section">PASSENGER</div>
+    <div class="s-item" onclick="setNav(this)"><span class="s-ico">👥</span>Customers</div>
+    <div class="s-item" onclick="setNav(this)"><span class="s-ico">⭐</span>Ratings & Reviews</div>
+    <div class="s-item" onclick="setNav(this)"><span class="s-ico">🎯</span>Promotions</div>
+    <div class="s-item" onclick="setNav(this)"><span class="s-ico">🏥</span>Medical Rides</div>
+
+    <div class="s-section">DRIVERS</div>
+    <div class="s-item" onclick="setNav(this)"><span class="s-ico">👤</span>Driver Roster</div>
+    <div class="s-item" onclick="setNav(this)"><span class="s-ico">🚗</span>Vehicle Fleet</div>
+    <div class="s-item" onclick="setNav(this)"><span class="s-ico">💰</span>Earnings & Payouts</div>
+    <div class="s-item" onclick="setNav(this)"><span class="s-ico">🛡️</span>Safety Incidents<span class="s-badge sb-rose" id="sb-safety">2</span></div>
+
+    <div class="s-section">AI & ANALYTICS</div>
+    <div class="s-item" onclick="setNav(this)"><span class="s-ico">🧠</span>DispatchBrain AI</div>
+    <div class="s-item" onclick="setNav(this)"><span class="s-ico">📊</span>Analytics</div>
+    <div class="s-item" onclick="setNav(this)"><span class="s-ico">💳</span>Finance</div>
+
+    <div class="ai-brain">
+      <div class="ai-brain-title">NEXUS CORE — RIDE</div>
+      <div class="ai-row"><span>DispatchBrain</span><span class="ai-val up" id="ai1">94.2%</span></div>
+      <div class="ai-row"><span>ETA Prophet</span><span class="ai-val up" id="ai2">91.8%</span></div>
+      <div class="ai-row"><span>PricingEngine</span><span class="ai-val up" id="ai3">Optimal</span></div>
+      <div class="ai-row"><span>SafetyShield</span><span class="ai-val up" id="ai4">Active</span></div>
+    </div>
+  </nav>
+
+  <!-- ══ CENTER ════════════════════════════════════════════ -->
+  <main class="center">
+
+    <div class="pg-head fade-up">
+      <div>
+        <div class="pg-title">🚕 Taxi Operations — Live</div>
+        <div class="pg-sub">Real-time AI-managed ride dispatch & fleet management</div>
+      </div>
+      <div class="hd-right">
+        <button class="btn btn-outline">📥 Export</button>
+        <button class="btn btn-ride">+ Manual Dispatch</button>
+      </div>
+    </div>
+
+    <!-- KPI ROW -->
+    <div class="kpi-row fade-up delay1">
+      <div class="kpi" style="--kc:var(--ride)">
+        <div class="kpi-ico">🚖</div>
+        <div class="kpi-lbl">Active Rides</div>
+        <div class="kpi-val" id="k-active">32</div>
+        <div class="kpi-sub up" id="k-active-d">↑ 8 vs 1hr ago</div>
+      </div>
+      <div class="kpi" style="--kc:var(--amber)">
+        <div class="kpi-ico">🕐</div>
+        <div class="kpi-lbl">Avg Pickup ETA</div>
+        <div class="kpi-val" id="k-eta">4.2<span style="font-size:14px;font-weight:400"> min</span></div>
+        <div class="kpi-sub up">↓ 0.8 min improved</div>
+      </div>
+      <div class="kpi" style="--kc:var(--emerald)">
+        <div class="kpi-ico">👤</div>
+        <div class="kpi-lbl">Online Drivers</div>
+        <div class="kpi-val" id="k-drivers">168</div>
+        <div class="kpi-sub">of 200 registered</div>
+      </div>
+      <div class="kpi" style="--kc:var(--lavender)">
+        <div class="kpi-ico">💰</div>
+        <div class="kpi-lbl">Revenue Today</div>
+        <div class="kpi-val">$<span id="k-rev">9,248</span></div>
+        <div class="kpi-sub up">↑ 21% vs last week</div>
+      </div>
+      <div class="kpi" style="--kc:var(--rose)">
+        <div class="kpi-ico">⭐</div>
+        <div class="kpi-lbl">Avg Rating</div>
+        <div class="kpi-val" id="k-rating">4.87</div>
+        <div class="kpi-sub up">↑ 0.04 this week</div>
+      </div>
+    </div>
+
+    <!-- MAIN GRID -->
+    <div class="grid-main delay2 fade-up">
+
+      <!-- Fleet Map -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">🗺 Live Fleet Map <span style="font-size:10px;background:rgba(0,212,255,.1);color:var(--ride);padding:2px 8px;border-radius:6px;font-family:var(--mono)">LIVE</span></div>
+          <span style="font-size:11px;color:var(--amber);font-family:var(--mono);">⚡ Surge: Downtown ×1.8</span>
+        </div>
+        <div class="map-wrap">
+          <svg class="map-svg" viewBox="0 0 500 220" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern id="g" width="30" height="30" patternUnits="userSpaceOnUse">
+                <path d="M30 0L0 0 0 30" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+              </pattern>
+              <radialGradient id="h1"><stop offset="0%" stop-color="rgba(255,107,53,0.3)"/><stop offset="100%" stop-color="rgba(255,107,53,0)"/></radialGradient>
+              <radialGradient id="h2"><stop offset="0%" stop-color="rgba(0,212,255,0.15)"/><stop offset="100%" stop-color="rgba(0,212,255,0)"/></radialGradient>
+            </defs>
+            <rect width="100%" height="100%" fill="#0d1526"/>
+            <rect width="100%" height="100%" fill="url(#g)"/>
+            <!-- Roads -->
+            <g stroke="rgba(255,255,255,0.08)" stroke-width="12" fill="none" stroke-linecap="round">
+              <line x1="0" y1="80" x2="500" y2="80"/>
+              <line x1="0" y1="150" x2="500" y2="150"/>
+              <line x1="120" y1="0" x2="120" y2="220"/>
+              <line x1="280" y1="0" x2="280" y2="220"/>
+              <line x1="420" y1="0" x2="420" y2="220"/>
+            </g>
+            <!-- Buildings -->
+            <g fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.03)" stroke-width="1">
+              <rect x="20" y="20" width="80" height="50" rx="4"/>
+              <rect x="145" y="20" width="110" height="50" rx="4"/>
+              <rect x="300" y="20" width="100" height="50" rx="4"/>
+              <rect x="20" y="100" width="80" height="40" rx="4"/>
+              <rect x="145" y="100" width="110" height="40" rx="4"/>
+              <rect x="300" y="100" width="100" height="40" rx="4"/>
+              <rect x="440" y="20" width="50" height="50" rx="4"/>
+              <rect x="20" y="165" width="80" height="45" rx="4"/>
+              <rect x="145" y="165" width="110" height="45" rx="4"/>
+              <rect x="440" y="100" width="50" height="40" rx="4"/>
+            </g>
+            <!-- Demand heat -->
+            <ellipse cx="200" cy="100" rx="100" ry="70" fill="url(#h1)" opacity=".7"/>
+            <ellipse cx="350" cy="60" rx="70" ry="50" fill="url(#h2)" opacity=".6"/>
+            <!-- Route lines -->
+            <path d="M80 175 Q150 120 240 100" stroke="rgba(0,212,255,0.5)" stroke-width="2" fill="none" stroke-dasharray="6,4"/>
+            <path d="M180 55 Q280 70 380 55" stroke="rgba(0,255,136,0.4)" stroke-width="2" fill="none" stroke-dasharray="6,4"/>
+          </svg>
+          <!-- Animated driver dots -->
+          <div id="map-drivers" style="position:absolute;inset:0;pointer-events:none"></div>
+
+          <!-- Legend -->
+          <div style="position:absolute;bottom:10px;left:10px;display:flex;gap:10px;background:rgba(8,13,24,.85);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:10px;font-family:var(--mono);">
+            <span style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:50%;background:var(--ride);display:inline-block;box-shadow:0 0 6px var(--ride)"></span>Available</span>
+            <span style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:50%;background:var(--amber);display:inline-block;box-shadow:0 0 6px var(--amber)"></span>On Trip</span>
+            <span style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:50%;background:var(--rose);display:inline-block;box-shadow:0 0 6px var(--rose)"></span>SOS</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Vehicle Breakdown -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">🚗 Fleet by Vehicle Type</div>
+          <span style="font-size:11px;color:var(--txt2)">168 online</span>
+        </div>
+        <div class="card-body">
+          <div id="vtype-list"></div>
+
+          <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+            <div class="card-title" style="margin-bottom:10px;font-size:12px">Trips / Hour Today</div>
+            <div class="chart-bars" id="hourly-chart"></div>
+            <div class="chart-labels" id="hourly-labels"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BOTTOM GRID -->
+    <div class="grid-bottom delay3 fade-up">
+      <!-- Live Trips -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">🔴 Live Trips</div>
+          <span class="s-badge sb-cyan" style="font-size:10px" id="live-count">32</span>
+        </div>
+        <div class="card-body" id="live-trips" style="max-height:220px"></div>
+      </div>
+
+      <!-- Surge Zones -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">⚡ Surge Zones</div>
+          <span style="font-size:10px;font-family:var(--mono);color:var(--txt2)">AI-managed</span>
+        </div>
+        <div class="card-body">
+          <div class="surge-grid" id="surge-grid"></div>
+        </div>
+      </div>
+
+      <!-- Driver Leaderboard -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">🏆 Top Drivers Today</div>
+          <button class="btn btn-outline" style="padding:4px 10px;font-size:10px">View all</button>
+        </div>
+        <div class="card-body" id="leaderboard"></div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ══ RIGHT PANEL ═══════════════════════════════════════ -->
+  <aside class="right-panel">
+    <div class="rp-head">
+      <div class="rp-title notif-dot">📬 Dispatch & Alerts</div>
+      <div class="tabs2">
+        <div class="tab2 on" onclick="rpTab(this,'queue')">Queue (14)</div>
+        <div class="tab2" onclick="rpTab(this,'alerts')">Alerts (3)</div>
+        <div class="tab2" onclick="rpTab(this,'chat')">AI Chat</div>
+      </div>
+    </div>
+    <div class="rp-body" id="rp-body"></div>
+  </aside>
+
+</div>
+
+<script>
+// ── CLOCK ──────────────────────────────────────────────────
+const clockEl = document.getElementById('clock');
+setInterval(() => {
+  clockEl.textContent = new Date().toLocaleTimeString('en-US',{hour12:false}) + ' UTC';
+}, 1000);
+
+// ── NAV ────────────────────────────────────────────────────
+function setNav(el) {
+  document.querySelectorAll('.s-item').forEach(i=>i.classList.remove('on'));
+  el.classList.add('on');
+}
+
+// ── DATA ───────────────────────────────────────────────────
+const trips = [
+  {id:'TRP-9831',from:'Central Park',to:'JFK Airport',status:'live',driver:'Marcus B.',fare:42.80,eta:'12 min',type:'luxury'},
+  {id:'TRP-9830',from:'Times Square',to:'Brooklyn',status:'coming',driver:'Sarah L.',fare:24.50,eta:'4 min pickup',type:'standard'},
+  {id:'TRP-9829',from:'Midtown',to:'Upper East Side',status:'searching',driver:null,fare:18.20,eta:'Finding...',type:'standard'},
+  {id:'TRP-9828',from:'East Village',to:'LGA Airport',status:'live',driver:'Priya R.',fare:38.00,eta:'22 min',type:'suv'},
+  {id:'TRP-9827',from:'Chelsea',to:'Harlem',status:'done',driver:'Alex K.',fare:21.60,eta:'Done',type:'standard'},
+];
+
+const scMap = {live:'s-live',coming:'s-coming',searching:'s-searching',done:'s-done',cancel:'s-cancel'};
+const slMap = {live:'On Trip',coming:'En Route',searching:'Searching',done:'Completed',cancel:'Cancelled'};
+
+// ── LIVE TRIPS ──────────────────────────────────────────────
+document.getElementById('live-trips').innerHTML = trips.map(t=>`
+  <div class="trip-card">
+    <div class="tc-top">
+      <span class="tc-id">${t.id}</span>
+      <span class="tc-status ${scMap[t.status]}">${slMap[t.status]}</span>
+    </div>
+    <div class="tc-route">
+      <div class="tc-from"><span class="rt-dot" style="background:var(--ride)"></span>${t.from}</div>
+      <div class="tc-to"><span class="rt-dot" style="background:var(--rose)"></span>${t.to}</div>
+    </div>
+    <div class="tc-meta">
+      <span>${t.driver ? '👤 '+t.driver : '<span style="color:var(--lavender)">AI searching...</span>'}</span>
+      <div style="display:flex;gap:10px">
+        <span>${t.eta}</span>
+        <span class="tc-fare">$${t.fare.toFixed(2)}</span>
+      </div>
+    </div>
+  </div>
+`).join('');
+
+// ── VEHICLE TYPES ───────────────────────────────────────────
+const vtypes = [
+  {ico:'🚗',name:'Standard Sedan',count:72,total:80,color:'var(--ride)'},
+  {ico:'🏎',name:'Luxury / Premium',count:18,total:25,color:'var(--lavender)'},
+  {ico:'🚙',name:'SUV / 7-Seater',count:34,total:40,color:'var(--emerald)'},
+  {ico:'🚌',name:'Share / Pool',count:28,total:40,color:'var(--amber)'},
+  {ico:'🏥',name:'Medical Transport',count:16,total:15,color:'var(--rose)'},
+];
+
+document.getElementById('vtype-list').innerHTML = vtypes.map(v=>{
+  const pct = Math.min((v.count/v.total)*100,100);
+  return `<div class="vtype-row">
+    <div class="vtype-ico">${v.ico}</div>
+    <div class="vtype-bar-wrap">
+      <div class="vtype-name"><span>${v.name}</span><span style="font-family:var(--mono);font-size:11px;color:var(--txt2)">${v.count} online</span></div>
+      <div class="vtype-bar"><div class="vtype-fill" style="width:${pct}%;background:${v.color}"></div></div>
+    </div>
+  </div>`;
+}).join('');
+
+// ── HOURLY CHART ────────────────────────────────────────────
+const hourly=[4,3,2,3,5,12,28,42,38,45,50,48,42,52,56,60,72,88,76,64,58,48,40,30];
+const now=new Date().getHours();
+const sliced=hourly.slice(0,now+1);
+const maxH=Math.max(...sliced);
+const chartEl=document.getElementById('hourly-chart');
+const labsEl=document.getElementById('hourly-labels');
+chartEl.innerHTML=sliced.map((v,i)=>{
+  const h=Math.max((v/maxH)*100,3);
+  const isCur=i===now;
+  return `<div class="cb" style="height:${h}%;background:${isCur?'var(--ride)':'rgba(0,212,255,0.3)'};${isCur?'box-shadow:0 0 10px rgba(0,212,255,0.5)':''}" data-v="${v} trips"></div>`;
+}).join('');
+labsEl.innerHTML=['00','04','08','12','16','20'].map(l=>`<div class="cl" style="flex:4">${l}</div>`).join('');
+
+// ── SURGE ZONES ─────────────────────────────────────────────
+const surgeZones=[
+  {name:'Downtown',mult:1.8,demand:'Very High',color:'#ff4466'},
+  {name:'Midtown',mult:1.5,demand:'High',color:'#ffb547'},
+  {name:'Airport',mult:1.3,demand:'Moderate',color:'#ffb547'},
+  {name:'Brooklyn',mult:1.0,demand:'Normal',color:'var(--ride)'},
+  {name:'Uptown',mult:1.2,demand:'Moderate',color:'var(--ride)'},
+  {name:'Queens',mult:1.0,demand:'Normal',color:'var(--ride)'},
+];
+
+document.getElementById('surge-grid').innerHTML=surgeZones.map(z=>`
+  <div class="surge-z">
+    <div class="sz-fill" style="background:${z.color}"></div>
+    <div class="sz-mult" style="color:${z.color}">${z.mult}×</div>
+    <div class="sz-name">${z.name}</div>
+    <div class="sz-demand" style="color:${z.color}">${z.demand}</div>
+  </div>
+`).join('');
+
+// ── LEADERBOARD ─────────────────────────────────────────────
+const leaders=[
+  {name:'Marcus B.',type:'Luxury',trips:22,earn:'$420',color:'#00d4ff',init:'MB'},
+  {name:'Sarah L.',type:'Standard',trips:19,earn:'$285',color:'#00ff88',init:'SL'},
+  {name:'Priya R.',type:'SUV',trips:17,earn:'$318',color:'#b388ff',init:'PR'},
+  {name:'Alex K.',type:'Standard',trips:16,earn:'$240',color:'#ffb547',init:'AK'},
+  {name:'Kai T.',type:'Share',trips:31,earn:'$195',color:'#ff6b6b',init:'KT'},
+];
+
+document.getElementById('leaderboard').innerHTML=leaders.map((d,i)=>`
+  <div class="lb-row">
+    <div class="lb-rank">${i+1}</div>
+    <div class="lb-av" style="background:${d.color}22;color:${d.color}">${d.init}</div>
+    <div class="lb-info">
+      <div class="lb-name">${d.name}</div>
+      <div class="lb-type">${d.type} · ${d.trips} trips</div>
+    </div>
+    <div class="lb-nums">
+      <div class="lb-earn">${d.earn}</div>
+      <div class="lb-trips">⭐ 4.${88+i*3>99?9:88+i}</div>
+    </div>
+  </div>
+`).join('');
+
+// ── MAP DRIVERS ─────────────────────────────────────────────
+const driverDots=[
+  {l:16,t:30,c:'var(--ride)'},{l:27,t:55,c:'var(--amber)'},{l:40,t:25,c:'var(--ride)'},
+  {l:52,t:60,c:'var(--amber)'},{l:65,t:38,c:'var(--ride)'},{l:74,t:70,c:'var(--amber)'},
+  {l:83,t:28,c:'var(--ride)'},{l:36,t:78,c:'var(--ride)'},{l:57,t:42,c:'var(--amber)'},
+  {l:20,t:75,c:'var(--ride)'},{l:62,t:83,c:'var(--amber)'},{l:88,t:60,c:'var(--rose)'},
+];
+
+document.getElementById('map-drivers').innerHTML=driverDots.map((d,i)=>`
+  <div style="position:absolute;left:${d.l}%;top:${d.t}%;width:10px;height:10px;border-radius:50%;
+    background:${d.c};box-shadow:0 0 8px ${d.c};transform:translate(-50%,-50%);
+    transition:left 4s ease,top 4s ease;animation:${d.c===('var(--amber)')?'driverPulse 2s infinite':''}" 
+    id="dd${i}"></div>
+`).join('');
+
+setInterval(()=>{
+  driverDots.forEach((d,i)=>{
+    d.l=Math.min(95,Math.max(5,d.l+(Math.random()-.5)*3));
+    d.t=Math.min(90,Math.max(10,d.t+(Math.random()-.5)*3));
+    const el=document.getElementById('dd'+i);
+    if(el){el.style.left=d.l+'%';el.style.top=d.t+'%';}
+  });
+},4000);
+
+// ── RIGHT PANEL ─────────────────────────────────────────────
+const queue=[
+  {id:'REQ-1441',from:'Penn Station',to:'JFK Airport',wait:'2:18',ai:0.92},
+  {id:'REQ-1440',from:'SoHo',to:'LaGuardia',wait:'1:45',ai:0.87},
+  {id:'REQ-1439',from:'Harlem',to:'Downtown',wait:'0:55',ai:0.94},
+  {id:'REQ-1438',from:'Flushing',to:'Times Sq.',wait:'3:01',ai:0.78},
+];
+
+const alerts=[
+  {type:'crit',ico:'🚨',title:'SOS — TRP-9820',desc:'Driver activated SOS at 5th Ave & 42nd St. Emergency services notified.',time:'1 min ago'},
+  {type:'warn',ico:'⚡',title:'Surge Spike — Downtown',desc:'Demand ratio hit 2.4×. AI auto-surge set to ×1.8. 6 drivers repositioned.',time:'4 min ago'},
+  {type:'info',ico:'🧠',title:'AI Model Update',desc:'ETA Prophet v4.2 deployed. Rush-hour accuracy +3.1%.',time:'22 min ago'},
+];
+
+function rpTab(el,type){
+  el.closest('.tabs2').querySelectorAll('.tab2').forEach(t=>t.classList.remove('on'));
+  el.classList.add('on');
+  renderRP(type);
+}
+
+function renderRP(type='queue'){
+  const body=document.getElementById('rp-body');
+  if(type==='queue'){
+    body.innerHTML=queue.map(q=>`
+      <div class="dq-item">
+        <div class="dq-top">
+          <span class="dq-id">${q.id}</span>
+          <span class="dq-wait">⏱ ${q.wait}</span>
+        </div>
+        <div class="dq-route" style="font-size:11px;color:var(--txt2)">${q.from} → ${q.to}</div>
+        <div class="dq-ai">
+          <span>AI Match</span>
+          <div class="dq-ai-bar"><div class="dq-ai-fill" style="width:${q.ai*100}%"></div></div>
+          <span style="color:var(--ride)">${(q.ai*100).toFixed(0)}%</span>
+        </div>
+        <div class="dq-actions">
+          <button class="dq-btn dq-assign">⚡ AI Assign</button>
+          <button class="dq-btn dq-assign" style="background:rgba(0,255,136,.1);color:var(--emerald)">👤 Manual</button>
+          <button class="dq-btn dq-skip">✕</button>
+        </div>
+      </div>
+    `).join('');
+  } else if(type==='alerts'){
+    body.innerHTML=alerts.map(a=>`
+      <div class="al-item al-${a.type==='crit'?'crit':a.type==='warn'?'warn':'info'}">
+        <div class="al-ico">${a.ico}</div>
+        <div>
+          <div class="al-title">${a.title}</div>
+          <div class="al-desc">${a.desc}</div>
+          <div class="al-time">${a.time}</div>
+        </div>
+      </div>
+    `).join('');
+  } else {
+    body.innerHTML=`
+      <div style="padding:20px 0;text-align:center;color:var(--txt2)">
+        <div style="font-size:32px;margin-bottom:10px">🧠</div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:6px">NexusChat AI</div>
+        <div style="font-size:11px">Claude-powered support for drivers, customers, and operations</div>
+        <div style="margin-top:20px;background:var(--dark2);border-radius:12px;padding:16px;border:1px solid var(--border);text-align:left">
+          <div style="font-size:10px;font-family:var(--mono);color:var(--ride);margin-bottom:8px">▸ RECENT ACTIONS</div>
+          <div style="font-size:11px;color:var(--txt2);margin-bottom:6px">✓ Auto-resolved 14 support tickets today</div>
+          <div style="font-size:11px;color:var(--txt2);margin-bottom:6px">✓ Processed 3 refund requests</div>
+          <div style="font-size:11px;color:var(--txt2)">✓ Escalated 1 complaint to L2</div>
+        </div>
+      </div>`;
+  }
+}
+renderRP('queue');
+
+// ── LIVE METRICS UPDATE ─────────────────────────────────────
+setInterval(()=>{
+  document.getElementById('k-active').textContent=28+Math.floor(Math.random()*8);
+  document.getElementById('k-eta').textContent=(3.8+Math.random()*.8).toFixed(1);
+  document.getElementById('k-drivers').textContent=165+Math.floor(Math.random()*8);
+  document.getElementById('q-count').textContent=12+Math.floor(Math.random()*6);
+  document.getElementById('sb-queue').textContent=12+Math.floor(Math.random()*6);
+  document.getElementById('ai1').textContent=(93+Math.random()*2).toFixed(1)+'%';
+  document.getElementById('ai2').textContent=(90+Math.random()*3).toFixed(1)+'%';
+},5000);
+</script>
+<script src="nexus-client.js"></script>
+</body>
+</html>

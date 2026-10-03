@@ -1,0 +1,1784 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXUS LOGISTICS — Operations Command</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap"
+    rel="stylesheet">
+  <style>
+    /* ─── ROOT & THEME ─────────────────────────────────────── */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #050709;
+      --bg1: #0b0e14;
+      --bg2: #111520;
+      --bg3: #161c2e;
+      --line: rgba(255, 255, 255, 0.06);
+      --line2: rgba(255, 255, 255, 0.12);
+
+      --accent: #00e5ff;
+      --accent2: #ff6b35;
+      --accent3: #7fff6b;
+      --accent4: #c084fc;
+      --amber: #ffc107;
+      --red: #ff4444;
+      --green: #00e676;
+
+      --text: #e8eaf0;
+      --text2: #8892a4;
+      --text3: #4a5568;
+
+      --radius: 12px;
+      --mono: 'JetBrains Mono', monospace;
+      --sans: 'Syne', sans-serif;
+
+      --glow-c: 0 0 30px rgba(0, 229, 255, 0.2);
+      --glow-o: 0 0 30px rgba(255, 107, 53, 0.2);
+      --glow-g: 0 0 30px rgba(127, 255, 107, 0.15);
+    }
+
+    html,
+    body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 14px;
+      overflow: hidden;
+    }
+
+    /* ─── SCROLLBAR ─────────────────────────────────────────── */
+    ::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--line2);
+      border-radius: 2px;
+    }
+
+    /* ─── LAYOUT ────────────────────────────────────────────── */
+    .layout {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      grid-template-rows: 56px 1fr;
+      height: 100vh;
+    }
+
+    /* ─── TOPBAR ────────────────────────────────────────────── */
+    .topbar {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+      gap: 20px;
+      background: var(--bg1);
+      border-bottom: 1px solid var(--line);
+      position: relative;
+      z-index: 100;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      color: var(--text);
+    }
+
+    .logo-icon {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, var(--accent), var(--accent4));
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    .logo span {
+      color: var(--accent);
+    }
+
+    .topbar-center {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 32px;
+    }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text2);
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: pulse 2s infinite;
+    }
+
+    .dot.amber {
+      background: var(--amber);
+      box-shadow: 0 0 8px var(--amber);
+    }
+
+    .dot.red {
+      background: var(--red);
+      box-shadow: 0 0 8px var(--red);
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.4;
+      }
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent4), var(--accent));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    /* ─── SIDEBAR ───────────────────────────────────────────── */
+    .sidebar {
+      background: var(--bg1);
+      border-right: 1px solid var(--line);
+      padding: 16px 0;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .nav-section {
+      padding: 8px 12px 4px;
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text3);
+      font-family: var(--mono);
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      margin: 1px 8px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text2);
+      position: relative;
+    }
+
+    .nav-item:hover {
+      background: var(--bg2);
+      color: var(--text);
+    }
+
+    .nav-item.active {
+      background: rgba(0, 229, 255, 0.08);
+      color: var(--accent);
+    }
+
+    .nav-item.active::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 20%;
+      bottom: 20%;
+      width: 2px;
+      background: var(--accent);
+      border-radius: 0 2px 2px 0;
+    }
+
+    .nav-icon {
+      font-size: 15px;
+      width: 20px;
+      text-align: center;
+    }
+
+    .nav-badge {
+      margin-left: auto;
+      background: var(--accent);
+      color: var(--bg);
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 10px;
+      font-family: var(--mono);
+    }
+
+    .nav-badge.red {
+      background: var(--red);
+      color: white;
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    .ai-status-card {
+      background: linear-gradient(135deg, rgba(0, 229, 255, 0.06), rgba(192, 132, 252, 0.06));
+      border: 1px solid rgba(0, 229, 255, 0.15);
+      border-radius: 10px;
+      padding: 12px;
+    }
+
+    .ai-status-title {
+      font-size: 10px;
+      color: var(--accent);
+      font-family: var(--mono);
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+
+    .ai-metric {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+      font-size: 11px;
+    }
+
+    .ai-metric span:first-child {
+      color: var(--text2);
+    }
+
+    .ai-metric .val {
+      font-family: var(--mono);
+      color: var(--green);
+      font-size: 12px;
+    }
+
+    /* ─── MAIN CONTENT ──────────────────────────────────────── */
+    .main {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      overflow: hidden;
+      background: var(--bg);
+    }
+
+    .main-header {
+      padding: 20px 24px 0;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+
+    .page-title {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -0.02em;
+    }
+
+    .page-sub {
+      font-size: 12px;
+      color: var(--text3);
+      margin-top: 2px;
+      font-family: var(--mono);
+    }
+
+    .main-toolbar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-family: var(--sans);
+      font-size: 12px;
+      font-weight: 600;
+      transition: all 0.15s;
+    }
+
+    .btn-ghost {
+      background: var(--bg2);
+      color: var(--text2);
+      border: 1px solid var(--line2);
+    }
+
+    .btn-ghost:hover {
+      background: var(--bg3);
+      color: var(--text);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: var(--bg);
+    }
+
+    .btn-primary:hover {
+      opacity: 0.85;
+    }
+
+    /* ─── DASHBOARD GRID ────────────────────────────────────── */
+    .dashboard {
+      padding: 16px 24px 24px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* ─── METRICS ROW ───────────────────────────────────────── */
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 12px;
+    }
+
+    .metric-card {
+      background: var(--bg1);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+
+    .metric-card:hover {
+      border-color: var(--line2);
+    }
+
+    .metric-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--card-accent, var(--accent));
+    }
+
+    .metric-label {
+      font-size: 10px;
+      color: var(--text3);
+      font-family: var(--mono);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .metric-value {
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--text);
+      line-height: 1;
+      letter-spacing: -0.02em;
+    }
+
+    .metric-unit {
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--text3);
+      margin-left: 2px;
+    }
+
+    .metric-delta {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 6px;
+      font-size: 11px;
+      font-family: var(--mono);
+    }
+
+    .delta-up {
+      color: var(--green);
+    }
+
+    .delta-down {
+      color: var(--red);
+    }
+
+    .metric-icon {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      font-size: 18px;
+      opacity: 0.4;
+    }
+
+    /* ─── MAIN PANELS ───────────────────────────────────────── */
+    .panels-row {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 16px;
+      min-height: 0;
+    }
+
+    .panel {
+      background: var(--bg1);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--line);
+      flex-shrink: 0;
+    }
+
+    .panel-title {
+      font-size: 13px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .panel-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .panel-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 18px;
+    }
+
+    /* ─── MAP PANEL ─────────────────────────────────────────── */
+    .map-panel {
+      position: relative;
+      min-height: 320px;
+    }
+
+    .map-canvas {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      background: var(--bg2);
+      overflow: hidden;
+    }
+
+    /* SVG Map simulation */
+    .map-svg {
+      width: 100%;
+      height: 100%;
+      opacity: 0.8;
+    }
+
+    .map-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: none;
+    }
+
+    .driver-dot {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      cursor: pointer;
+      pointer-events: all;
+    }
+
+    .driver-dot.taxi {
+      background: var(--accent);
+      box-shadow: 0 0 10px var(--accent);
+    }
+
+    .driver-dot.freight {
+      background: var(--accent2);
+      box-shadow: 0 0 10px var(--accent2);
+    }
+
+    .driver-dot.on-trip {
+      background: var(--amber);
+      box-shadow: 0 0 10px var(--amber);
+      animation: driverPulse 1.5s infinite;
+    }
+
+    @keyframes driverPulse {
+
+      0%,
+      100% {
+        transform: translate(-50%, -50%) scale(1);
+      }
+
+      50% {
+        transform: translate(-50%, -50%) scale(1.3);
+      }
+    }
+
+    .demand-heat {
+      position: absolute;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255, 107, 53, 0.25) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .map-controls {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .map-btn {
+      width: 32px;
+      height: 32px;
+      background: rgba(11, 14, 20, 0.9);
+      border: 1px solid var(--line2);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--text2);
+      font-size: 14px;
+      transition: all 0.15s;
+    }
+
+    .map-btn:hover {
+      background: var(--bg3);
+      color: var(--text);
+    }
+
+    .map-legend {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      display: flex;
+      gap: 12px;
+      background: rgba(11, 14, 20, 0.85);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 11px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text2);
+    }
+
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    /* ─── TRIPS LIST ────────────────────────────────────────── */
+    .trip-item {
+      padding: 12px;
+      border-radius: 8px;
+      background: var(--bg2);
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+      border: 1px solid transparent;
+    }
+
+    .trip-item:hover {
+      border-color: var(--line2);
+      background: var(--bg3);
+    }
+
+    .trip-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .trip-id {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--accent);
+    }
+
+    .trip-status {
+      font-size: 10px;
+      font-family: var(--mono);
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .status-active {
+      background: rgba(0, 229, 255, 0.1);
+      color: var(--accent);
+    }
+
+    .status-enroute {
+      background: rgba(255, 193, 7, 0.1);
+      color: var(--amber);
+    }
+
+    .status-completed {
+      background: rgba(0, 230, 118, 0.1);
+      color: var(--green);
+    }
+
+    .status-searching {
+      background: rgba(192, 132, 252, 0.1);
+      color: var(--accent4);
+    }
+
+    .status-cancelled {
+      background: rgba(255, 68, 68, 0.1);
+      color: var(--red);
+    }
+
+    .trip-route {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 12px;
+      color: var(--text2);
+    }
+
+    .trip-route-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .route-dot-pick {
+      color: var(--green);
+      font-size: 10px;
+    }
+
+    .route-dot-drop {
+      color: var(--red);
+      font-size: 10px;
+    }
+
+    .trip-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 8px;
+      font-size: 11px;
+      color: var(--text3);
+    }
+
+    .trip-fare {
+      font-family: var(--mono);
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    /* ─── BOTTOM ROW ────────────────────────────────────────── */
+    .bottom-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+    }
+
+    /* ─── CHART BARS ────────────────────────────────────────── */
+    .chart-container {
+      height: 120px;
+      display: flex;
+      align-items: flex-end;
+      gap: 6px;
+      padding: 8px 0;
+    }
+
+    .chart-bar {
+      flex: 1;
+      border-radius: 4px 4px 0 0;
+      transition: height 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+      cursor: pointer;
+      position: relative;
+    }
+
+    .chart-bar:hover {
+      opacity: 0.8;
+    }
+
+    .chart-bar-label {
+      position: absolute;
+      bottom: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 9px;
+      color: var(--text3);
+      font-family: var(--mono);
+      white-space: nowrap;
+    }
+
+    .chart-bar-val {
+      position: absolute;
+      top: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 9px;
+      color: var(--text2);
+      font-family: var(--mono);
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+
+    .chart-bar:hover .chart-bar-val {
+      opacity: 1;
+    }
+
+    /* ─── AI INSIGHTS ───────────────────────────────────────── */
+    .insight-item {
+      display: flex;
+      gap: 12px;
+      padding: 10px;
+      border-radius: 8px;
+      background: var(--bg2);
+      margin-bottom: 8px;
+      border-left: 3px solid var(--insight-color, var(--accent));
+    }
+
+    .insight-icon {
+      font-size: 18px;
+    }
+
+    .insight-text {
+      flex: 1;
+    }
+
+    .insight-title {
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .insight-desc {
+      font-size: 11px;
+      color: var(--text2);
+      line-height: 1.4;
+    }
+
+    .insight-time {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text3);
+      margin-top: 4px;
+    }
+
+    /* ─── DRIVER LEADERBOARD ────────────────────────────────── */
+    .driver-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .driver-row:last-child {
+      border-bottom: none;
+    }
+
+    .driver-rank {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text3);
+      width: 20px;
+    }
+
+    .driver-avatar-sm {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .driver-info {
+      flex: 1;
+    }
+
+    .driver-name {
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .driver-type {
+      font-size: 10px;
+      color: var(--text3);
+      font-family: var(--mono);
+    }
+
+    .driver-stats {
+      text-align: right;
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+
+    .driver-trips {
+      color: var(--text2);
+    }
+
+    .driver-rating {
+      color: var(--amber);
+    }
+
+    /* ─── PROGRESS RING ─────────────────────────────────────── */
+    .ring-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      padding: 8px 0;
+    }
+
+    .ring {
+      position: relative;
+      width: 80px;
+      height: 80px;
+    }
+
+    .ring svg {
+      transform: rotate(-90deg);
+    }
+
+    .ring-label {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+
+    .ring-value {
+      font-size: 16px;
+      font-weight: 800;
+      font-family: var(--mono);
+    }
+
+    .ring-name {
+      font-size: 9px;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    /* ─── ALERTS ────────────────────────────────────────────── */
+    .alert-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+
+    .alert-critical {
+      background: rgba(255, 68, 68, 0.08);
+      border: 1px solid rgba(255, 68, 68, 0.2);
+    }
+
+    .alert-warning {
+      background: rgba(255, 193, 7, 0.08);
+      border: 1px solid rgba(255, 193, 7, 0.2);
+    }
+
+    .alert-info {
+      background: rgba(0, 229, 255, 0.05);
+      border: 1px solid rgba(0, 229, 255, 0.1);
+    }
+
+    .alert-icon {
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .alert-body {
+      flex: 1;
+    }
+
+    .alert-title {
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .alert-meta {
+      color: var(--text3);
+      font-family: var(--mono);
+      font-size: 10px;
+    }
+
+    /* ─── TAG ───────────────────────────────────────────────── */
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 10px;
+      font-weight: 600;
+      font-family: var(--mono);
+    }
+
+    .tag-cyan {
+      background: rgba(0, 229, 255, 0.1);
+      color: var(--accent);
+    }
+
+    .tag-orange {
+      background: rgba(255, 107, 53, 0.1);
+      color: var(--accent2);
+    }
+
+    .tag-purple {
+      background: rgba(192, 132, 252, 0.1);
+      color: var(--accent4);
+    }
+
+    /* ─── MINI SPARKLINE ────────────────────────────────────── */
+    .sparkline {
+      height: 36px;
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      margin-top: 8px;
+    }
+
+    .spark-bar {
+      flex: 1;
+      border-radius: 2px;
+      background: var(--spark-color, rgba(0, 229, 255, 0.3));
+      transition: height 0.4s ease;
+    }
+
+    /* ─── ANIMATIONS ────────────────────────────────────────── */
+    .fade-in {
+      animation: fadeIn 0.4s ease forwards;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .slide-in {
+      animation: slideIn 0.3s ease forwards;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(-10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    /* ─── SURGE INDICATOR ───────────────────────────────────── */
+    .surge-zones {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .surge-zone {
+      background: var(--bg2);
+      border-radius: 8px;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .surge-mult {
+      font-size: 20px;
+      font-weight: 800;
+      font-family: var(--mono);
+    }
+
+    .surge-zone-name {
+      font-size: 10px;
+      color: var(--text3);
+      margin-top: 2px;
+    }
+
+    /* ─── FILTER TABS ───────────────────────────────────────── */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--bg2);
+      border-radius: 8px;
+      padding: 3px;
+    }
+
+    .tab {
+      padding: 5px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text3);
+      transition: all 0.15s;
+    }
+
+    .tab.active {
+      background: var(--bg3);
+      color: var(--text);
+    }
+
+    .tab:hover:not(.active) {
+      color: var(--text2);
+    }
+
+    /* ─── TOOLTIP ───────────────────────────────────────────── */
+    [data-tip] {
+      position: relative;
+    }
+
+    [data-tip]:hover::after {
+      content: attr(data-tip);
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg3);
+      border: 1px solid var(--line2);
+      color: var(--text);
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 200;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="layout">
+
+    <!-- ─── TOPBAR ─── -->
+    <header class="topbar">
+      <div class="logo">
+        <div class="logo-icon">⬡</div>
+        NEXUS<span>.</span>OPS
+      </div>
+
+      <div class="topbar-center">
+        <div class="status-pill">
+          <div class="dot"></div>
+          AI ENGINE <span style="color:var(--green);font-weight:600;">LIVE</span>
+        </div>
+        <div class="status-pill">
+          <div class="dot amber"></div>
+          DISPATCH QUEUE: <span id="queue-count" style="color:var(--amber);font-weight:600;">12</span>
+        </div>
+        <div class="status-pill" style="font-size:12px; color:var(--text2);" id="clock">
+          --:--:--
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <div style="display:flex;gap:6px;padding-right:12px;border-right:1px solid var(--line);">
+          <a href="ride.html"
+            style="padding:6px 14px;border-radius:8px;font-size:11px;font-weight:700;border:1px solid rgba(0,212,255,0.3);background:rgba(0,212,255,0.1);color:#00d4ff;text-decoration:none;font-family:var(--sans);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:4px;">🚕
+            RIDE</a>
+          <a href="freight.html"
+            style="padding:6px 14px;border-radius:8px;font-size:11px;font-weight:700;border:1px solid rgba(255,149,0,0.3);background:rgba(255,149,0,0.1);color:#ff9500;text-decoration:none;font-family:var(--sans);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:4px;">🚛
+            FREIGHT</a>
+        </div>
+        <button class="btn btn-ghost" style="font-size:11px;">🔔 <span id="notif-badge"
+            style="color:var(--red);">3</span></button>
+        <div class="avatar" data-tip="Admin User">A</div>
+      </div>
+    </header>
+
+    <!-- ─── SIDEBAR ─── -->
+    <nav class="sidebar">
+      <div class="nav-section">OPERATIONS</div>
+      <div class="nav-item active" onclick="setActive(this)">
+        <span class="nav-icon">⬡</span> Command Center
+      </div>
+      <div class="nav-item" onclick="setActive(this)">
+        <span class="nav-icon">🚕</span> Live Trips
+        <span class="nav-badge" id="active-trips-badge">28</span>
+      </div>
+      <div class="nav-item" onclick="setActive(this)">
+        <span class="nav-icon">📦</span> Deliveries
+        <span class="nav-badge" id="active-del-badge">14</span>
+      </div>
+      <div class="nav-item" onclick="setActive(this)">
+        <span class="nav-icon">🗺️</span> Fleet Map
+      </div>
+      <div class="nav-item" onclick="setActive(this)">
+        <span class="nav-icon">⚡</span> Surge Zones
+      </div>
+
+      <div class="nav-section">MANAGEMENT</div>
+      <div class="nav-item" onclick="setActive(this)">
+        <span class="nav-icon">👤</span> Drivers
+      </div>
+      <div class="nav-item" onclick="setActive(this)">
+        <span class="nav-icon">🚗</span> Fleet
+      </div>
+      <div class="nav-item" onclick="setActive(this)">
+        <span class="nav-icon">💳</span> Payments
+      </div>
+      <div class="nav-item" onclick="setActive(this)">
+        <span class="nav-icon">🎯</span> Promotions
+      </div>
+
+      <div class="nav-section">AI & ANALYTICS</div>
+      <div class="nav-item" onclick="setActive(this)">
+        <span class="nav-icon">🧠</span> NEXUS CORE
+      </div>
+      <div class="nav-item" onclick="setActive(this)">
+        <span class="nav-icon">📊</span> Analytics
+      </div>
+      <div class="nav-item" onclick="setActive(this)">
+        <span class="nav-icon">🛡️</span> Safety
+        <span class="nav-badge red" id="safety-badge">2</span>
+      </div>
+      <div class="nav-item" onclick="setActive(this)">
+        <span class="nav-icon">⚙️</span> Settings
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="ai-status-card">
+          <div class="ai-status-title">▸ NEXUS CORE STATUS</div>
+          <div class="ai-metric">
+            <span>DispatchBrain</span>
+            <span class="val" id="ai-dispatch">94.2%</span>
+          </div>
+          <div class="ai-metric">
+            <span>ETA Prophet</span>
+            <span class="val" id="ai-eta">91.8%</span>
+          </div>
+          <div class="ai-metric">
+            <span>Demand Oracle</span>
+            <span class="val" id="ai-demand">97.1%</span>
+          </div>
+          <div class="ai-metric">
+            <span>FraudSentinel</span>
+            <span class="val" id="ai-fraud">99.6%</span>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- ─── MAIN ─── -->
+    <main class="main">
+      <div class="main-header">
+        <div>
+          <div class="page-title">Command Center</div>
+          <div class="page-sub">Real-time operations · AI-managed dispatch</div>
+        </div>
+        <div class="main-toolbar">
+          <div class="tabs">
+            <div class="tab active">All</div>
+            <div class="tab">Taxi</div>
+            <div class="tab">Freight</div>
+          </div>
+          <button class="btn btn-ghost">⬇ Export</button>
+          <button class="btn btn-primary">+ Manual Dispatch</button>
+        </div>
+      </div>
+
+      <div class="dashboard">
+
+        <!-- ─── METRICS ROW ─── -->
+        <div class="metrics-row fade-in">
+
+          <div class="metric-card" style="--card-accent:var(--accent);">
+            <div class="metric-icon">🚕</div>
+            <div class="metric-label">Active Trips</div>
+            <div class="metric-value" id="m-active">28</div>
+            <div class="sparkline">
+              <div class="spark-bar" style="height:40%"></div>
+              <div class="spark-bar" style="height:55%"></div>
+              <div class="spark-bar" style="height:70%"></div>
+              <div class="spark-bar" style="height:50%"></div>
+              <div class="spark-bar" style="height:80%"></div>
+              <div class="spark-bar" style="height:65%"></div>
+              <div class="spark-bar" style="height:100%"></div>
+            </div>
+          </div>
+
+          <div class="metric-card" style="--card-accent:var(--accent2);">
+            <div class="metric-icon">📦</div>
+            <div class="metric-label">Active Deliveries</div>
+            <div class="metric-value" id="m-deliveries">14</div>
+            <div class="sparkline" style="--spark-color:rgba(255,107,53,0.3)">
+              <div class="spark-bar" style="height:30%"></div>
+              <div class="spark-bar" style="height:50%"></div>
+              <div class="spark-bar" style="height:40%"></div>
+              <div class="spark-bar" style="height:70%"></div>
+              <div class="spark-bar" style="height:55%"></div>
+              <div class="spark-bar" style="height:80%"></div>
+              <div class="spark-bar" style="height:100%"></div>
+            </div>
+          </div>
+
+          <div class="metric-card" style="--card-accent:var(--green);">
+            <div class="metric-icon">👤</div>
+            <div class="metric-label">Online Drivers</div>
+            <div class="metric-value" id="m-drivers">142<span class="metric-unit">/ 200</span></div>
+            <div class="metric-delta delta-up">↑ 12 from yesterday</div>
+          </div>
+
+          <div class="metric-card" style="--card-accent:var(--amber);">
+            <div class="metric-icon">💰</div>
+            <div class="metric-label">Today Revenue</div>
+            <div class="metric-value" id="m-revenue">$<span id="m-rev-num">8,420</span></div>
+            <div class="metric-delta delta-up">↑ 18% vs last week</div>
+          </div>
+
+          <div class="metric-card" style="--card-accent:var(--accent4);">
+            <div class="metric-icon">⭐</div>
+            <div class="metric-label">Avg Rating</div>
+            <div class="metric-value" id="m-rating">4.81</div>
+            <div class="metric-delta delta-up">↑ 0.03 this week</div>
+          </div>
+
+          <div class="metric-card" style="--card-accent:var(--red);">
+            <div class="metric-icon">🎯</div>
+            <div class="metric-label">Dispatch AI Accuracy</div>
+            <div class="metric-value" id="m-ai">94<span class="metric-unit">%</span></div>
+            <div class="metric-delta delta-up">↑ 2.1% vs baseline</div>
+          </div>
+
+        </div>
+
+        <!-- ─── MAIN PANELS ROW ─── -->
+        <div class="panels-row fade-in" style="animation-delay:0.1s;">
+
+          <!-- MAP -->
+          <div class="panel map-panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                🗺️ Live Fleet Map
+                <span class="tag tag-cyan">LIVE</span>
+              </div>
+              <div class="panel-actions">
+                <span class="tag tag-orange">Surge Zone: Downtown ×1.8</span>
+              </div>
+            </div>
+            <div class="map-canvas" id="map">
+              <!-- SVG Map Grid -->
+              <svg class="map-svg" viewBox="0 0 800 360" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="1" />
+                  </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#grid)" />
+                <!-- Roads -->
+                <g stroke="rgba(255,255,255,0.07)" stroke-width="2" fill="none">
+                  <line x1="0" y1="120" x2="800" y2="120" />
+                  <line x1="0" y1="240" x2="800" y2="240" />
+                  <line x1="200" y1="0" x2="200" y2="360" />
+                  <line x1="400" y1="0" x2="400" y2="360" />
+                  <line x1="600" y1="0" x2="600" y2="360" />
+                  <line x1="0" y1="180" x2="800" y2="180" />
+                  <!-- Diagonal roads -->
+                  <line x1="100" y1="0" x2="400" y2="360" stroke-width="1.5" />
+                  <line x1="500" y1="0" x2="800" y2="300" stroke-width="1.5" />
+                </g>
+                <!-- Highways -->
+                <g stroke="rgba(255,255,255,0.12)" stroke-width="4" fill="none">
+                  <path d="M 0 90 Q 400 80 800 95" />
+                  <path d="M 150 0 Q 160 180 120 360" />
+                </g>
+                <!-- City blocks -->
+                <g fill="rgba(255,255,255,0.02)">
+                  <rect x="220" y="20" width="60" height="80" rx="4" />
+                  <rect x="320" y="20" width="60" height="80" rx="4" />
+                  <rect x="220" y="140" width="60" height="80" rx="4" />
+                  <rect x="420" y="140" width="60" height="80" rx="4" />
+                  <rect x="620" y="260" width="60" height="80" rx="4" />
+                </g>
+                <!-- Demand heatmap -->
+                <defs>
+                  <radialGradient id="heat1" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="rgba(255,107,53,0.3)" />
+                    <stop offset="100%" stop-color="rgba(255,107,53,0)" />
+                  </radialGradient>
+                  <radialGradient id="heat2" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="rgba(255,107,53,0.2)" />
+                    <stop offset="100%" stop-color="rgba(255,107,53,0)" />
+                  </radialGradient>
+                </defs>
+                <ellipse cx="360" cy="160" rx="120" ry="90" fill="url(#heat1)" />
+                <ellipse cx="180" cy="90" rx="80" ry="60" fill="url(#heat2)" />
+              </svg>
+
+              <!-- Driver dots (will be animated by JS) -->
+              <div class="map-overlay" id="driver-overlay"></div>
+
+              <div class="map-controls">
+                <div class="map-btn" data-tip="Zoom in">+</div>
+                <div class="map-btn" data-tip="Zoom out">−</div>
+                <div class="map-btn" data-tip="Satellite">⬛</div>
+                <div class="map-btn" data-tip="Heatmap">🔥</div>
+              </div>
+
+              <div class="map-legend">
+                <div class="legend-item">
+                  <div class="legend-dot" style="background:var(--accent)"></div>
+                  Taxi (available)
+                </div>
+                <div class="legend-item">
+                  <div class="legend-dot" style="background:var(--accent2)"></div>
+                  Freight
+                </div>
+                <div class="legend-item">
+                  <div class="legend-dot" style="background:var(--amber)"></div>
+                  On Trip
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- LIVE TRIPS PANEL -->
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">🔴 Live Activity</div>
+              <div class="tabs" style="background:var(--bg2);">
+                <div class="tab active" onclick="switchTab(this,'trips')">Trips</div>
+                <div class="tab" onclick="switchTab(this,'freight')">Freight</div>
+                <div class="tab" onclick="switchTab(this,'alerts')">Alerts</div>
+              </div>
+            </div>
+            <div class="panel-body" id="live-panel">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ─── BOTTOM ROW ─── -->
+        <div class="bottom-row fade-in" style="animation-delay:0.2s;">
+
+          <!-- Revenue Chart -->
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">📈 Revenue Today</div>
+              <span style="font-size:11px;color:var(--text3);font-family:var(--mono);">Hourly breakdown</span>
+            </div>
+            <div class="panel-body">
+              <div class="chart-container" id="revenue-chart">
+                <!-- Populated by JS -->
+              </div>
+              <div
+                style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:24px;">
+                <span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>Now</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Performance Rings -->
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">🎯 AI Performance</div>
+              <span class="tag tag-cyan">NEXUS CORE</span>
+            </div>
+            <div class="panel-body">
+              <div class="ring-container" id="rings-container">
+                <!-- Populated by JS -->
+              </div>
+              <div id="ai-insights" style="margin-top:12px;"></div>
+            </div>
+          </div>
+
+          <!-- Top Drivers -->
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">🏆 Top Drivers Today</div>
+              <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;">See all</button>
+            </div>
+            <div class="panel-body" id="driver-leaderboard">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </main>
+
+  </div>
+
+  <script>
+    // ─── REAL-TIME CLOCK ─────────────────────────────────────────
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('clock').textContent = now.toLocaleTimeString('en-US', { hour12: false }) + ' UTC';
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // ─── NAV ─────────────────────────────────────────────────────
+    function setActive(el) {
+      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+      el.classList.add('active');
+    }
+
+    function switchTab(el, type) {
+      el.closest('.tabs').querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
+      renderLivePanel(type);
+    }
+
+    // ─── DATA SIMULATION ─────────────────────────────────────────
+    const tripStatuses = ['in_progress', 'driver_en_route', 'searching', 'completed', 'cancelled'];
+
+    const mockTrips = [
+      { id: 'TRP-982341', from: '5th Ave & 42nd St', to: 'JFK Airport', status: 'in_progress', driver: 'Marcus B.', fare: 38.40, eta: '12 min', type: 'taxi' },
+      { id: 'TRP-982340', from: 'Central Park N', to: 'Brooklyn Bridge', status: 'driver_en_route', driver: 'Sarah L.', fare: 24.80, eta: '4 min pickup', type: 'taxi' },
+      { id: 'TRP-982339', from: 'Times Square', to: 'LaGuardia Airport', status: 'searching', driver: null, fare: 42.00, eta: 'Finding driver...', type: 'taxi' },
+      { id: 'TRP-982338', from: 'Midtown East', to: 'Harlem', status: 'completed', driver: 'Alex K.', fare: 18.20, eta: 'Done', type: 'taxi' },
+      { id: 'TRP-982337', from: 'Lower East Side', to: 'Queens', status: 'in_progress', driver: 'Priya R.', fare: 22.50, eta: '8 min', type: 'taxi' },
+    ];
+
+    const mockDeliveries = [
+      { id: 'DEL-44201', from: 'Warehouse A', to: '123 Madison Ave', status: 'in_transit', driver: 'Carlos M.', fare: 65.00, weight: '45 kg', type: 'freight' },
+      { id: 'DEL-44200', from: 'Cold Storage Hub', to: 'Restaurant Row', status: 'in_transit', driver: 'Kenji T.', fare: 120.00, weight: '200 kg', type: 'cold_chain' },
+      { id: 'DEL-44199', from: 'FedEx Hub', to: 'Chelsea Market', status: 'picked_up', driver: 'Amara S.', fare: 28.50, weight: '5 kg', type: 'courier' },
+    ];
+
+    const mockAlerts = [
+      { type: 'critical', icon: '🚨', title: 'SOS: Trip TRP-982335', desc: 'Driver activated SOS button at 40.7580° N, 73.9855° W. Emergency services notified.', time: '2 min ago' },
+      { type: 'warning', icon: '⚡', title: 'Surge: Downtown Zone', desc: 'Demand/supply ratio at 2.1x. Auto-surge activated at ×1.8. 8 drivers repositioned by AI.', time: '5 min ago' },
+      { type: 'warning', icon: '🌡️', title: 'Cold Chain Alert: DEL-44200', desc: 'Temperature deviation detected: 6.2°C (max: 4°C). Driver notified. Monitoring.', time: '11 min ago' },
+      { type: 'info', icon: '🧠', title: 'AI Model Update', desc: 'ETA Prophet v4.1 deployed. +2.3% accuracy improvement on rush-hour predictions.', time: '28 min ago' },
+    ];
+
+    // ─── RENDER LIVE PANEL ────────────────────────────────────────
+    function statusClass(s) {
+      const map = {
+        'in_progress': 'status-active', 'in_transit': 'status-active',
+        'driver_en_route': 'status-enroute', 'completed': 'status-completed', 'delivered': 'status-completed',
+        'searching': 'status-searching', 'pending': 'status-searching',
+        'cancelled': 'status-cancelled', 'picked_up': 'status-enroute'
+      };
+      return map[s] || 'status-searching';
+    }
+
+    function statusLabel(s) {
+      const map = {
+        'in_progress': 'On Trip', 'in_transit': 'In Transit',
+        'driver_en_route': 'En Route', 'completed': 'Done', 'delivered': 'Delivered',
+        'searching': 'Searching', 'pending': 'Pending',
+        'cancelled': 'Cancelled', 'picked_up': 'Picked Up'
+      };
+      return map[s] || s;
+    }
+
+    function renderLivePanel(type = 'trips') {
+      const panel = document.getElementById('live-panel');
+
+      if (type === 'alerts') {
+        panel.innerHTML = mockAlerts.map(a => `
+      <div class="alert-item alert-${a.type} slide-in">
+        <div class="alert-icon">${a.icon}</div>
+        <div class="alert-body">
+          <div class="alert-title">${a.title}</div>
+          <div style="font-size:11px;color:var(--text2);margin:3px 0 4px;">${a.desc}</div>
+          <div class="alert-meta">${a.time}</div>
+        </div>
+      </div>
+    `).join('');
+        return;
+      }
+
+      const data = type === 'freight' ? mockDeliveries : mockTrips;
+
+      panel.innerHTML = data.map(t => `
+    <div class="trip-item slide-in">
+      <div class="trip-header">
+        <span class="trip-id">${t.id}</span>
+        <span class="trip-status ${statusClass(t.status)}">${statusLabel(t.status)}</span>
+      </div>
+      <div class="trip-route">
+        <div class="trip-route-item">
+          <span class="route-dot-pick">●</span>
+          <span>${t.from}</span>
+        </div>
+        <div class="trip-route-item">
+          <span class="route-dot-drop">●</span>
+          <span>${t.to}</span>
+        </div>
+      </div>
+      <div class="trip-footer">
+        <span>${t.driver ? '👤 ' + t.driver : '<span style="color:var(--accent4)">AI searching...</span>'}</span>
+        <div style="display:flex;gap:12px;align-items:center;">
+          ${t.weight ? `<span style="font-family:var(--mono);font-size:10px;color:var(--text3);">${t.weight}</span>` : ''}
+          <span style="font-size:10px;color:var(--text3);font-family:var(--mono);">${t.eta}</span>
+          <span class="trip-fare">$${parseFloat(t.fare).toFixed(2)}</span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+    }
+
+    renderLivePanel('trips');
+
+    // ─── REVENUE CHART ────────────────────────────────────────────
+    const hourlyRevenue = [120, 80, 60, 50, 90, 200, 450, 620, 580, 700, 750, 820, 650, 780, 820, 900, 1100, 1200, 980, 850, 750, 680, 540, 380];
+    const maxRev = Math.max(...hourlyRevenue);
+    const currentHour = new Date().getHours();
+
+    const chartEl = document.getElementById('revenue-chart');
+    chartEl.innerHTML = hourlyRevenue.slice(0, currentHour + 1).map((v, i) => {
+      const h = (v / maxRev * 100).toFixed(0);
+      const isCurrent = i === currentHour;
+      const alpha = isCurrent ? '1' : i > 17 ? '0.8' : '0.5';
+      return `
+    <div class="chart-bar" style="
+      height:${h}%;
+      background:${isCurrent ? 'var(--accent)' : 'rgba(0,229,255,' + alpha + ')'};
+      ${isCurrent ? 'box-shadow: 0 0 12px rgba(0,229,255,0.5);' : ''}
+    ">
+      <span class="chart-bar-val">$${v}</span>
+    </div>
+  `;
+    }).join('');
+
+    // ─── PERFORMANCE RINGS ────────────────────────────────────────
+    const rings = [
+      { label: 'Dispatch', value: 94, color: 'var(--accent)' },
+      { label: 'ETA Acc.', value: 88, color: 'var(--accent4)' },
+      { label: 'Completion', value: 97, color: 'var(--green)' },
+    ];
+
+    const ringsEl = document.getElementById('rings-container');
+    ringsEl.innerHTML = rings.map(r => {
+      const circumference = 2 * Math.PI * 30;
+      const dashOffset = circumference * (1 - r.value / 100);
+      return `
+    <div style="text-align:center;">
+      <div class="ring">
+        <svg width="80" height="80" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="30" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="6"/>
+          <circle cx="40" cy="40" r="30" fill="none" stroke="${r.color}" stroke-width="6"
+            stroke-linecap="round"
+            stroke-dasharray="${circumference}"
+            stroke-dashoffset="${dashOffset}"
+            style="transition: stroke-dashoffset 1s ease; filter: drop-shadow(0 0 4px ${r.color})"/>
+        </svg>
+        <div class="ring-label">
+          <div class="ring-value" style="color:${r.color}">${r.value}%</div>
+          <div class="ring-name">${r.label}</div>
+        </div>
+      </div>
+    </div>
+  `;
+    }).join('');
+
+    document.getElementById('ai-insights').innerHTML = `
+  <div class="insight-item" style="--insight-color:var(--accent);">
+    <div class="insight-icon">🧠</div>
+    <div class="insight-text">
+      <div class="insight-title">AI Repositioning</div>
+      <div class="insight-desc">6 idle drivers repositioned to predicted demand zones. Est. +12% trip efficiency.</div>
+      <div class="insight-time">Auto-executed 4 min ago</div>
+    </div>
+  </div>
+  <div class="insight-item" style="--insight-color:var(--amber);">
+    <div class="insight-icon">⚡</div>
+    <div class="insight-text">
+      <div class="insight-title">Surge Predicted</div>
+      <div class="insight-desc">DemandOracle forecasts 2.3x demand in Airport Zone in 45 min. Pre-positioning drivers.</div>
+      <div class="insight-time">Confidence: 89%</div>
+    </div>
+  </div>
+`;
+
+    // ─── DRIVER LEADERBOARD ───────────────────────────────────────
+    const topDrivers = [
+      { name: 'Marcus B.', type: 'Taxi · Luxury', trips: 18, rating: 4.99, earnings: '$320', color: '#00e5ff', initials: 'MB' },
+      { name: 'Sarah L.', type: 'Taxi · Standard', trips: 16, rating: 4.95, earnings: '$248', color: '#7fff6b', initials: 'SL' },
+      { name: 'Carlos M.', type: 'Freight', trips: 9, rating: 4.92, earnings: '$415', color: '#ff6b35', initials: 'CM' },
+      { name: 'Priya R.', type: 'Taxi · SUV', trips: 14, rating: 4.88, earnings: '$218', color: '#c084fc', initials: 'PR' },
+      { name: 'Kenji T.', type: 'Cold Chain', trips: 6, rating: 4.97, earnings: '$380', color: '#ffc107', initials: 'KT' },
+    ];
+
+    document.getElementById('driver-leaderboard').innerHTML = topDrivers.map((d, i) => `
+  <div class="driver-row">
+    <div class="driver-rank">${i + 1}</div>
+    <div class="driver-avatar-sm" style="background:linear-gradient(135deg,${d.color}33,${d.color}55);color:${d.color};">
+      ${d.initials}
+    </div>
+    <div class="driver-info">
+      <div class="driver-name">${d.name}</div>
+      <div class="driver-type">${d.type}</div>
+    </div>
+    <div class="driver-stats">
+      <div class="driver-trips">${d.trips} trips</div>
+      <div class="driver-rating">⭐ ${d.rating}</div>
+      <div style="color:var(--green);font-size:11px;">${d.earnings}</div>
+    </div>
+  </div>
+`).join('');
+
+    // ─── DRIVER DOTS ON MAP ───────────────────────────────────────
+    const overlay = document.getElementById('driver-overlay');
+    const driverPositions = [
+      { type: 'taxi', status: 'available', left: 15, top: 30 },
+      { type: 'taxi', status: 'on-trip', left: 25, top: 55 },
+      { type: 'taxi', status: 'available', left: 40, top: 22 },
+      { type: 'taxi', status: 'on-trip', left: 50, top: 65 },
+      { type: 'freight', status: 'available', left: 65, top: 40 },
+      { type: 'taxi', status: 'available', left: 72, top: 70 },
+      { type: 'taxi', status: 'on-trip', left: 85, top: 25 },
+      { type: 'freight', status: 'on-trip', left: 78, top: 55 },
+      { type: 'taxi', status: 'available', left: 35, top: 80 },
+      { type: 'taxi', status: 'available', left: 55, top: 38 },
+      { type: 'freight', status: 'available', left: 20, top: 75 },
+      { type: 'taxi', status: 'on-trip', left: 60, top: 85 },
+    ];
+
+    overlay.innerHTML = driverPositions.map(d => `
+  <div class="driver-dot ${d.type} ${d.status === 'on-trip' ? 'on-trip' : ''}"
+       style="left:${d.left}%;top:${d.top}%;"></div>
+`).join('');
+
+    // ─── LIVE DATA UPDATES ─────────────────────────────────────────
+    function updateMetrics() {
+      // Simulate live updates
+      const active = 26 + Math.floor(Math.random() * 6);
+      const del = 12 + Math.floor(Math.random() * 5);
+      const drivers = 138 + Math.floor(Math.random() * 10);
+      const rev = (8200 + Math.random() * 500).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+      animateNumber('m-active', active);
+      animateNumber('m-deliveries', del);
+      document.getElementById('m-rev-num').textContent = rev;
+      document.getElementById('queue-count').textContent = 10 + Math.floor(Math.random() * 8);
+      document.getElementById('active-trips-badge').textContent = active;
+      document.getElementById('active-del-badge').textContent = del;
+
+      // Update AI scores
+      document.getElementById('ai-dispatch').textContent = (93 + Math.random() * 2).toFixed(1) + '%';
+      document.getElementById('ai-eta').textContent = (90 + Math.random() * 3).toFixed(1) + '%';
+    }
+
+    function animateNumber(id, target) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const current = parseInt(el.textContent) || 0;
+      const diff = target - current;
+      if (diff === 0) return;
+      const step = diff / 10;
+      let count = 0;
+      const interval = setInterval(() => {
+        count++;
+        const newVal = Math.round(current + step * count);
+        el.textContent = newVal;
+        if (count >= 10) { el.textContent = target; clearInterval(interval); }
+      }, 50);
+    }
+
+    // Animate driver dots
+    function animateDrivers() {
+      const dots = document.querySelectorAll('.driver-dot');
+      dots.forEach(dot => {
+        const newLeft = parseFloat(dot.style.left) + (Math.random() - 0.5) * 2;
+        const newTop = parseFloat(dot.style.top) + (Math.random() - 0.5) * 2;
+        dot.style.left = Math.min(95, Math.max(5, newLeft)) + '%';
+        dot.style.top = Math.min(90, Math.max(10, newTop)) + '%';
+        dot.style.transition = 'left 3s ease, top 3s ease';
+      });
+    }
+
+    setInterval(updateMetrics, 4000);
+    setInterval(animateDrivers, 3000);
+
+    // Initial animation of rings
+    setTimeout(() => {
+      const circles = document.querySelectorAll('[stroke-dashoffset]');
+      // Rings already animate via CSS transition on render
+    }, 100);
+
+  </script>
+  <script src="nexus-client.js"></script>
+</body>
+
+</html>

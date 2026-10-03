@@ -1,0 +1,1447 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXUS FREIGHT — Logistics Command Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,700&family=Barlow+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <style>
+    /* ═══════════════════════════════════════════════════
+   NEXUS FREIGHT — AMBER / INDUSTRIAL DARK THEME
+   Identity: Heavy, reliable, industrial logistics
+═══════════════════════════════════════════════════ */
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0
+    }
+
+    :root {
+      --void: #060507;
+      --dark: #0c0a0f;
+      --dark2: #131018;
+      --dark3: #1a1622;
+      --border: rgba(255, 255, 255, 0.06);
+      --border2: rgba(255, 255, 255, 0.11);
+
+      --freight: #ff9500;
+      /* Amber orange — NEXUS FREIGHT brand */
+      --freight2: #e07000;
+      --freight-glow: rgba(255, 149, 0, 0.2);
+      --blue: #4da6ff;
+      --green: #39d98a;
+      --red: #ff4757;
+      --ice: #a0e4ff;
+      /* Cold chain accent */
+      --purple: #bf9aff;
+
+      --txt: #e0dce8;
+      --txt2: #6e667d;
+      --txt3: #342e3f;
+
+      --mono: 'Barlow Mono', monospace;
+      --sans: 'Barlow', sans-serif;
+      --r: 12px;
+    }
+
+    html,
+    body {
+      height: 100%;
+      background: var(--void);
+      color: var(--txt);
+      font-family: var(--sans);
+      overflow: hidden
+    }
+
+    ::-webkit-scrollbar {
+      width: 3px
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border2);
+      border-radius: 2px
+    }
+
+    /* Diagonal texture */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(-45deg, transparent, transparent 40px,
+          rgba(255, 149, 0, 0.012) 40px, rgba(255, 149, 0, 0.012) 41px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ─── LAYOUT ─── */
+    .root {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      grid-template-rows: 62px 1fr;
+      height: 100vh;
+      position: relative;
+      z-index: 1
+    }
+
+    /* ═══ TOPBAR ═════════════════════════════════════════ */
+    .topbar {
+      grid-column: 1/-1;
+      background: rgba(12, 10, 15, 0.96);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 0 22px;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding-right: 22px;
+      border-right: 1px solid var(--border)
+    }
+
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--freight), var(--freight2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      box-shadow: 0 0 24px var(--freight-glow);
+      animation: freightPulse 4s ease-in-out infinite;
+    }
+
+    @keyframes freightPulse {
+
+      0%,
+      100% {
+        box-shadow: 0 0 24px var(--freight-glow)
+      }
+
+      50% {
+        box-shadow: 0 0 40px rgba(255, 149, 0, .35)
+      }
+    }
+
+    .brand-text {
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: .01em
+    }
+
+    .brand-text em {
+      font-style: normal;
+      color: var(--freight)
+    }
+
+    .brand-sub {
+      font-size: 9px;
+      color: var(--txt3);
+      font-family: var(--mono);
+      letter-spacing: .14em;
+      margin-top: 1px
+    }
+
+    .top-stats {
+      display: flex;
+      gap: 0;
+      margin-left: 4px
+    }
+
+    .ts-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 20px;
+      border-right: 1px solid var(--border);
+    }
+
+    .ts-item:first-child {
+      border-left: 1px solid var(--border);
+      margin-left: 16px
+    }
+
+    .ts-val {
+      font-size: 18px;
+      font-weight: 800;
+      font-family: var(--mono);
+      line-height: 1;
+      color: var(--txt)
+    }
+
+    .ts-lbl {
+      font-size: 9px;
+      color: var(--txt3);
+      font-family: var(--mono);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin-top: 2px
+    }
+
+    .top-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 12px
+    }
+
+    .status-row {
+      display: flex;
+      gap: 8px
+    }
+
+    .s-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 100px;
+      border: 1px solid var(--border);
+      background: var(--dark2);
+      font-size: 10px;
+      font-family: var(--mono);
+      color: var(--txt2)
+    }
+
+    .sp-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      animation: spd 2s infinite
+    }
+
+    @keyframes spd {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: .3
+      }
+    }
+
+    .sp-green {
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green)
+    }
+
+    .sp-amber {
+      background: var(--freight);
+      box-shadow: 0 0 6px var(--freight)
+    }
+
+    .clock-big {
+      font-family: var(--mono);
+      font-size: 15px;
+      color: var(--txt2);
+      padding: 0 16px;
+      border-left: 1px solid var(--border)
+    }
+
+    .div-btns {
+      display: flex;
+      gap: 6px;
+      padding-left: 12px;
+      border-left: 1px solid var(--border)
+    }
+
+    .db-btn {
+      padding: 7px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: var(--sans);
+      transition: .15s
+    }
+
+    .db-freight {
+      background: rgba(255, 149, 0, .12);
+      color: var(--freight);
+      border-color: rgba(255, 149, 0, .3)
+    }
+
+    .db-ride {
+      background: transparent;
+      color: var(--txt2)
+    }
+
+    .db-ride:hover {
+      background: rgba(0, 212, 255, .08);
+      color: #00d4ff;
+      border-color: rgba(0, 212, 255, .2)
+    }
+
+    /* ═══ SIDEBAR ════════════════════════════════════════ */
+    .sidebar {
+      background: var(--dark);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 16px 0;
+      overflow-y: auto
+    }
+
+    .ss {
+      padding: 10px 16px 4px;
+      font-size: 9px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--txt3);
+      font-family: var(--mono)
+    }
+
+    .si {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 9px 16px;
+      margin: 1px 8px;
+      border-radius: 9px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--txt2);
+      transition: .15s;
+      position: relative
+    }
+
+    .si:hover {
+      background: var(--dark2);
+      color: var(--txt)
+    }
+
+    .si.on {
+      background: rgba(255, 149, 0, .1);
+      color: var(--freight)
+    }
+
+    .si.on::after {
+      content: '';
+      position: absolute;
+      left: -8px;
+      top: 25%;
+      bottom: 25%;
+      width: 3px;
+      border-radius: 0 3px 3px 0;
+      background: var(--freight);
+      box-shadow: 0 0 10px var(--freight)
+    }
+
+    .si-ico {
+      font-size: 15px;
+      width: 20px;
+      text-align: center
+    }
+
+    .si-badge {
+      margin-left: auto;
+      padding: 1px 7px;
+      border-radius: 7px;
+      font-size: 9px;
+      font-weight: 700;
+      font-family: var(--mono)
+    }
+
+    .ba {
+      background: rgba(255, 149, 0, .15);
+      color: var(--freight)
+    }
+
+    .bb {
+      background: rgba(255, 71, 87, .15);
+      color: var(--red)
+    }
+
+    .bc {
+      background: rgba(160, 228, 255, .12);
+      color: var(--ice)
+    }
+
+    .bd {
+      background: rgba(57, 217, 138, .12);
+      color: var(--green)
+    }
+
+    .ai-box {
+      margin: auto 12px 0;
+      background: linear-gradient(135deg, rgba(255, 149, 0, .06), rgba(191, 154, 255, .05));
+      border: 1px solid rgba(255, 149, 0, .12);
+      border-radius: 12px;
+      padding: 14px
+    }
+
+    .aib-title {
+      font-size: 9px;
+      font-family: var(--mono);
+      letter-spacing: .1em;
+      color: var(--freight);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px
+    }
+
+    .aib-title::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--freight);
+      box-shadow: 0 0 8px var(--freight);
+      animation: spd 2s infinite
+    }
+
+    .aib-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 5px;
+      font-size: 11px
+    }
+
+    .aib-row span:first-child {
+      color: var(--txt2)
+    }
+
+    .aib-val {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--green)
+    }
+
+    .aib-warn {
+      color: var(--freight)
+    }
+
+    /* ═══ MAIN ═══════════════════════════════════════════ */
+    .main {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      padding: 18px;
+      overflow-y: auto
+    }
+
+    .ph {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      flex-shrink: 0
+    }
+
+    .ph-title {
+      font-size: 21px;
+      font-weight: 800;
+      letter-spacing: -.02em
+    }
+
+    .ph-title em {
+      color: var(--freight);
+      font-style: normal
+    }
+
+    .ph-sub {
+      font-size: 10px;
+      color: var(--txt3);
+      font-family: var(--mono);
+      margin-top: 2px
+    }
+
+    .ph-right {
+      display: flex;
+      gap: 8px
+    }
+
+    .btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 9px;
+      border: none;
+      cursor: pointer;
+      font-family: var(--sans);
+      font-size: 12px;
+      font-weight: 700;
+      transition: .15s
+    }
+
+    .btn-g {
+      background: var(--dark2);
+      color: var(--txt2);
+      border: 1px solid var(--border2)
+    }
+
+    .btn-g:hover {
+      background: var(--dark3);
+      color: var(--txt)
+    }
+
+    .btn-f {
+      background: var(--freight);
+      color: #000
+    }
+
+    .btn-f:hover {
+      box-shadow: 0 4px 20px rgba(255, 149, 0, .35);
+      transform: translateY(-1px)
+    }
+
+    /* KPI ROW */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 11px;
+      flex-shrink: 0
+    }
+
+    .kpi {
+      background: var(--dark);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 14px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color .2s
+    }
+
+    .kpi:hover {
+      border-color: var(--border2)
+    }
+
+    .kpi::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--kc, var(--freight))
+    }
+
+    .kpi-ico {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 18px;
+      opacity: .3
+    }
+
+    .kpi-lbl {
+      font-size: 9px;
+      color: var(--txt3);
+      font-family: var(--mono);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin-bottom: 5px
+    }
+
+    .kpi-val {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -.03em;
+      line-height: 1
+    }
+
+    .kpi-sub {
+      font-size: 10px;
+      margin-top: 4px;
+      font-family: var(--mono)
+    }
+
+    .gn {
+      color: var(--green)
+    }
+
+    .rn {
+      color: var(--red)
+    }
+
+    .an {
+      color: var(--freight)
+    }
+
+    /* GRID */
+    .g2 {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 13px;
+      flex-shrink: 0
+    }
+
+    .g3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 13px;
+      flex-shrink: 0
+    }
+
+    .card {
+      background: var(--dark);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      overflow: hidden
+    }
+
+    .ch {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border)
+    }
+
+    .ct {
+      font-size: 13px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px
+    }
+
+    .cb {
+      padding: 14px 16px;
+      overflow-y: auto
+    }
+
+    /* Delivery item */
+    .del-item {
+      background: var(--dark2);
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      padding: 11px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: .15s
+    }
+
+    .del-item:hover {
+      border-color: var(--border2);
+      transform: translateX(2px)
+    }
+
+    .di-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px
+    }
+
+    .di-id {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--freight)
+    }
+
+    .di-tag {
+      font-size: 9px;
+      font-family: var(--mono);
+      padding: 2px 8px;
+      border-radius: 5px;
+      font-weight: 700;
+      text-transform: uppercase
+    }
+
+    .dt-transit {
+      background: rgba(255, 149, 0, .12);
+      color: var(--freight)
+    }
+
+    .dt-pickup {
+      background: rgba(57, 217, 138, .12);
+      color: var(--green)
+    }
+
+    .dt-cold {
+      background: rgba(160, 228, 255, .12);
+      color: var(--ice)
+    }
+
+    .dt-pending {
+      background: rgba(191, 154, 255, .12);
+      color: var(--purple)
+    }
+
+    .dt-done {
+      background: rgba(57, 217, 138, .1);
+      color: var(--green)
+    }
+
+    .di-cargo {
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 4px
+    }
+
+    .di-route {
+      font-size: 11px;
+      color: var(--txt2);
+      margin-bottom: 6px
+    }
+
+    .di-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      font-family: var(--mono);
+      color: var(--txt2)
+    }
+
+    .di-fare {
+      color: var(--txt);
+      font-weight: 700
+    }
+
+    /* Cold chain indicator */
+    .temp-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      font-family: var(--mono);
+      padding: 3px 8px;
+      border-radius: 6px;
+      margin-top: 5px
+    }
+
+    .temp-ok {
+      background: rgba(160, 228, 255, .1);
+      color: var(--ice)
+    }
+
+    .temp-warn {
+      background: rgba(255, 149, 0, .12);
+      color: var(--freight)
+    }
+
+    .temp-alert {
+      background: rgba(255, 71, 87, .12);
+      color: var(--red);
+      animation: tempWarn 1s infinite
+    }
+
+    @keyframes tempWarn {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: .5
+      }
+    }
+
+    /* Map */
+    .map-wrap {
+      height: 230px;
+      background: var(--dark2);
+      position: relative;
+      overflow: hidden
+    }
+
+    .msvg {
+      width: 100%;
+      height: 100%
+    }
+
+    .route-anim {
+      stroke-dasharray: 12 6;
+      animation: dash 2s linear infinite
+    }
+
+    @keyframes dash {
+      to {
+        stroke-dashoffset: -36
+      }
+    }
+
+    /* Fleet table */
+    .fleet-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px
+    }
+
+    .ft-head th {
+      padding: 8px 12px;
+      text-align: left;
+      font-size: 9px;
+      font-family: var(--mono);
+      letter-spacing: .1em;
+      color: var(--txt3);
+      border-bottom: 1px solid var(--border);
+      font-weight: 500
+    }
+
+    .ft-body td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border)
+    }
+
+    .ft-body tr:last-child td {
+      border-bottom: none
+    }
+
+    .ft-body tr:hover td {
+      background: var(--dark2)
+    }
+
+    .veh-ico {
+      font-size: 16px
+    }
+
+    .veh-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      font-family: var(--mono);
+      padding: 2px 8px;
+      border-radius: 5px;
+      font-weight: 700
+    }
+
+    .vs-on {
+      background: rgba(255, 149, 0, .12);
+      color: var(--freight)
+    }
+
+    .vs-avail {
+      background: rgba(57, 217, 138, .12);
+      color: var(--green)
+    }
+
+    .vs-idle {
+      background: rgba(110, 102, 125, .2);
+      color: var(--txt2)
+    }
+
+    .vs-maint {
+      background: rgba(255, 71, 87, .12);
+      color: var(--red)
+    }
+
+    .load-bar {
+      width: 80px;
+      height: 5px;
+      background: var(--dark3);
+      border-radius: 3px;
+      overflow: hidden;
+      display: inline-block;
+      vertical-align: middle
+    }
+
+    .load-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width .6s
+    }
+
+    /* Analytics row */
+    .chart-h {
+      display: flex;
+      align-items: flex-end;
+      gap: 4px;
+      height: 90px
+    }
+
+    .hb {
+      flex: 1;
+      border-radius: 3px 3px 0 0;
+      cursor: pointer;
+      transition: opacity .15s;
+      position: relative
+    }
+
+    .hb:hover {
+      opacity: .75
+    }
+
+    .hb::after {
+      content: attr(data-v);
+      position: absolute;
+      top: -15px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 8px;
+      font-family: var(--mono);
+      color: var(--txt2);
+      opacity: 0;
+      transition: .15s;
+      white-space: nowrap
+    }
+
+    .hb:hover::after {
+      opacity: 1
+    }
+
+    /* Category doughnuts */
+    .cat-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px
+    }
+
+    .cat-row {
+      display: flex;
+      align-items: center;
+      gap: 10px
+    }
+
+    .cat-ico {
+      font-size: 16px;
+      width: 28px
+    }
+
+    .cat-info {
+      flex: 1
+    }
+
+    .cat-name {
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 2px
+    }
+
+    .cat-bar {
+      height: 4px;
+      background: var(--dark3);
+      border-radius: 3px;
+      overflow: hidden
+    }
+
+    .cat-fill {
+      height: 100%;
+      border-radius: 3px
+    }
+
+    .cat-nums {
+      font-family: var(--mono);
+      font-size: 10px;
+      text-align: right;
+      color: var(--txt2)
+    }
+
+    /* AI Insights */
+    .ins-card {
+      background: var(--dark2);
+      border-radius: 9px;
+      padding: 11px;
+      margin-bottom: 8px;
+      border-left: 3px solid var(--ic, var(--freight))
+    }
+
+    .ins-title {
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 3px;
+      display: flex;
+      align-items: center;
+      gap: 6px
+    }
+
+    .ins-desc {
+      font-size: 11px;
+      color: var(--txt2);
+      line-height: 1.4
+    }
+
+    .ins-meta {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--txt3);
+      margin-top: 5px
+    }
+
+    /* Animations */
+    @keyframes fadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(10px)
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0)
+      }
+    }
+
+    .fu {
+      animation: fadeUp .35s ease forwards
+    }
+
+    .d1 {
+      animation-delay: .05s
+    }
+
+    .d2 {
+      animation-delay: .1s
+    }
+
+    .d3 {
+      animation-delay: .15s
+    }
+  </style>
+</head>
+
+<body>
+  <div class="root">
+
+    <!-- ══ TOPBAR ═══════════════════════════════════════════ -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-icon">🚛</div>
+        <div>
+          <div class="brand-text">NEXUS<em> FREIGHT</em></div>
+          <div class="brand-sub">Logistics & Goods Division</div>
+        </div>
+      </div>
+
+      <div class="top-stats">
+        <div class="ts-item">
+          <div class="ts-val" id="ts-del">47</div>
+          <div class="ts-lbl">Active Deliveries</div>
+        </div>
+        <div class="ts-item">
+          <div class="ts-val" id="ts-kg">14,820<span style="font-size:12px;font-weight:400"> kg</span></div>
+          <div class="ts-lbl">Cargo in Transit</div>
+        </div>
+        <div class="ts-item">
+          <div class="ts-val an" id="ts-rev">$21,480</div>
+          <div class="ts-lbl">Revenue Today</div>
+        </div>
+        <div class="ts-item">
+          <div class="ts-val gn">99.1<span style="font-size:12px;font-weight:400">%</span></div>
+          <div class="ts-lbl">On-Time Rate</div>
+        </div>
+      </div>
+
+      <div class="top-right">
+        <div class="status-row">
+          <div class="s-pill">
+            <div class="sp-dot sp-green"></div>LoadOptimizer LIVE
+          </div>
+          <div class="s-pill">
+            <div class="sp-dot sp-amber"></div>3 Cold Chain Active
+          </div>
+          <div class="s-pill">
+            <div class="sp-dot sp-green"></div>IoT Sensors OK
+          </div>
+        </div>
+        <div class="clock-big" id="clock">—</div>
+        <div class="div-btns">
+          <div class="db-btn db-freight">🚛 NEXUS FREIGHT</div>
+          <div class="db-btn db-ride" onclick="window.location.href='ride.html'">← 🚕 NEXUS RIDE</div>
+        </div>
+      </div>
+    </header>
+
+    <!-- ══ SIDEBAR ══════════════════════════════════════════ -->
+    <nav class="sidebar">
+      <div class="ss">FREIGHT OPS</div>
+      <div class="si on" onclick="setNav(this)"><span class="si-ico">⚡</span>Command Center</div>
+      <div class="si" onclick="setNav(this)"><span class="si-ico">📍</span>Live Cargo Map</div>
+      <div class="si" onclick="setNav(this)"><span class="si-ico">📦</span>Active Deliveries<span class="si-badge ba"
+          id="sb-del">47</span></div>
+      <div class="si" onclick="setNav(this)"><span class="si-ico">🕐</span>Pending Pickup<span
+          class="si-badge bd">12</span></div>
+      <div class="si" onclick="setNav(this)"><span class="si-ico">❄️</span>Cold Chain<span class="si-badge bc">3</span>
+      </div>
+      <div class="si" onclick="setNav(this)"><span class="si-ico">🔴</span>Incidents<span class="si-badge bb"
+          id="sb-inc">1</span></div>
+
+      <div class="ss">CARGO & FLEET</div>
+      <div class="si" onclick="setNav(this)"><span class="si-ico">🚛</span>Truck Fleet</div>
+      <div class="si" onclick="setNav(this)"><span class="si-ico">🏭</span>Warehouses</div>
+      <div class="si" onclick="setNav(this)"><span class="si-ico">🔧</span>Maintenance</div>
+      <div class="si" onclick="setNav(this)"><span class="si-ico">📦</span>Cargo Manifest</div>
+      <div class="si" onclick="setNav(this)"><span class="si-ico">🛡️</span>Insurance Claims</div>
+
+      <div class="ss">CLIENTS & FINANCE</div>
+      <div class="si" onclick="setNav(this)"><span class="si-ico">🏢</span>Corporate Clients</div>
+      <div class="si" onclick="setNav(this)"><span class="si-ico">📊</span>Revenue Analytics</div>
+      <div class="si" onclick="setNav(this)"><span class="si-ico">📄</span>Invoicing</div>
+      <div class="si" onclick="setNav(this)"><span class="si-ico">🤝</span>Contracts</div>
+
+      <div class="ss">AI & ROUTING</div>
+      <div class="si" onclick="setNav(this)"><span class="si-ico">🧠</span>LoadOptimizer AI</div>
+      <div class="si" onclick="setNav(this)"><span class="si-ico">🗺️</span>Route Intelligence</div>
+      <div class="si" onclick="setNav(this)"><span class="si-ico">📡</span>IoT Telemetry</div>
+
+      <div class="ai-box">
+        <div class="aib-title">NEXUS CORE — FREIGHT</div>
+        <div class="aib-row"><span>LoadOptimizer</span><span class="aib-val">97.3%</span></div>
+        <div class="aib-row"><span>RouteIntelligence</span><span class="aib-val">94.8%</span></div>
+        <div class="aib-row"><span>DemandOracle</span><span class="aib-val">91.2%</span></div>
+        <div class="aib-row"><span>TempAlerts</span><span class="aib-warn">1 Active ⚠</span></div>
+      </div>
+    </nav>
+
+    <!-- ══ MAIN ═════════════════════════════════════════════ -->
+    <main class="main">
+
+      <div class="ph fu">
+        <div>
+          <div class="ph-title">🚛 Freight <em>Operations</em> — Live</div>
+          <div class="ph-sub">AI-optimized cargo routing · Cold chain monitoring · Fleet intelligence</div>
+        </div>
+        <div class="ph-right">
+          <button class="btn btn-g">📥 Export Manifest</button>
+          <button class="btn btn-g">📄 Generate Invoice</button>
+          <button class="btn btn-f">+ New Delivery</button>
+        </div>
+      </div>
+
+      <!-- KPIs -->
+      <div class="kpi-row fu d1">
+        <div class="kpi" style="--kc:var(--freight)">
+          <div class="kpi-ico">📦</div>
+          <div class="kpi-lbl">In Transit</div>
+          <div class="kpi-val" id="k-transit">47</div>
+          <div class="kpi-sub an">↑ 11 from yesterday</div>
+        </div>
+        <div class="kpi" style="--kc:var(--ice)">
+          <div class="kpi-ico">❄️</div>
+          <div class="kpi-lbl">Cold Chain</div>
+          <div class="kpi-val" style="color:var(--ice)">3</div>
+          <div class="kpi-sub gn">All within temp range</div>
+        </div>
+        <div class="kpi" style="--kc:var(--green)">
+          <div class="kpi-ico">🚛</div>
+          <div class="kpi-lbl">Trucks Online</div>
+          <div class="kpi-val" id="k-trucks">38</div>
+          <div class="kpi-sub">of 45 total fleet</div>
+        </div>
+        <div class="kpi" style="--kc:var(--purple)">
+          <div class="kpi-ico">⚖️</div>
+          <div class="kpi-lbl">Cargo Weight</div>
+          <div class="kpi-val">14.8<span style="font-size:13px;font-weight:400"> t</span></div>
+          <div class="kpi-sub gn">↑ 8% capacity util.</div>
+        </div>
+        <div class="kpi" style="--kc:var(--green)">
+          <div class="kpi-ico">🎯</div>
+          <div class="kpi-lbl">On-Time Rate</div>
+          <div class="kpi-val gn">99.1<span style="font-size:12px">%</span></div>
+          <div class="kpi-sub gn">↑ 1.2% this month</div>
+        </div>
+        <div class="kpi" style="--kc:var(--freight)">
+          <div class="kpi-ico">💰</div>
+          <div class="kpi-lbl">Avg Revenue/Trip</div>
+          <div class="kpi-val">$457</div>
+          <div class="kpi-sub an">↑ $38 vs last week</div>
+        </div>
+      </div>
+
+      <!-- MAP + DELIVERIES -->
+      <div class="g2 fu d2">
+
+        <!-- Live Cargo Map -->
+        <div class="card">
+          <div class="ch">
+            <div class="ct">🗺 Live Cargo Tracking <span
+                style="font-size:10px;background:rgba(255,149,0,.1);color:var(--freight);padding:2px 8px;border-radius:5px;font-family:var(--mono)">LIVE</span>
+            </div>
+            <div style="display:flex;gap:8px;font-size:10px;font-family:var(--mono)">
+              <span style="color:var(--ice)">❄ Cold Chain</span>
+              <span style="color:var(--freight)">● En Route</span>
+              <span style="color:var(--green)">● Delivered</span>
+            </div>
+          </div>
+          <div class="map-wrap">
+            <svg class="msvg" viewBox="0 0 600 230" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <pattern id="fg" width="35" height="35" patternUnits="userSpaceOnUse">
+                  <path d="M35 0L0 0 0 35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="1" />
+                </pattern>
+              </defs>
+              <rect width="100%" height="100%" fill="#131018" />
+              <rect width="100%" height="100%" fill="url(#fg)" />
+              <!-- Highways -->
+              <g fill="none" stroke-linecap="round">
+                <line x1="0" y1="80" x2="600" y2="80" stroke="rgba(255,255,255,0.07)" stroke-width="14" />
+                <line x1="0" y1="160" x2="600" y2="160" stroke="rgba(255,255,255,0.07)" stroke-width="14" />
+                <line x1="150" y1="0" x2="150" y2="230" stroke="rgba(255,255,255,0.07)" stroke-width="10" />
+                <line x1="350" y1="0" x2="350" y2="230" stroke="rgba(255,255,255,0.07)" stroke-width="10" />
+                <line x1="520" y1="0" x2="520" y2="230" stroke="rgba(255,255,255,0.07)" stroke-width="8" />
+              </g>
+              <!-- City areas -->
+              <g fill="rgba(255,255,255,0.03)" stroke="none">
+                <rect x="20" y="20" width="110" height="50" rx="6" />
+                <rect x="170" y="20" width="160" height="50" rx="6" />
+                <rect x="370" y="20" width="100" height="50" rx="6" />
+                <rect x="20" y="100" width="110" height="50" rx="6" />
+                <rect x="170" y="100" width="160" height="50" rx="6" />
+                <rect x="370" y="100" width="100" height="50" rx="6" />
+                <rect x="540" y="20" width="50" height="50" rx="6" />
+                <rect x="20" y="175" width="110" height="45" rx="6" />
+              </g>
+              <!-- Warehouses -->
+              <g fill="rgba(255,149,0,0.15)" stroke="rgba(255,149,0,0.3)" stroke-width="1.5">
+                <rect x="55" y="35" width="40" height="30" rx="4" />
+                <rect x="390" y="35" width="40" height="30" rx="4" />
+              </g>
+              <text x="75" y="54" text-anchor="middle" fill="rgba(255,149,0,0.6)" font-size="8"
+                font-family="monospace">WH-A</text>
+              <text x="410" y="54" text-anchor="middle" fill="rgba(255,149,0,0.6)" font-size="8"
+                font-family="monospace">WH-B</text>
+              <!-- Routes -->
+              <path d="M75 65 Q200 70 250 115" stroke="rgba(255,149,0,0.6)" stroke-width="2" fill="none"
+                class="route-anim" />
+              <path d="M410 65 Q450 100 480 155" stroke="rgba(57,217,138,0.5)" stroke-width="2" fill="none"
+                class="route-anim" style="animation-delay:.5s" />
+              <path d="M75 65 Q300 60 520 80" stroke="rgba(160,228,255,0.6)" stroke-width="2.5" fill="none"
+                class="route-anim" style="animation-delay:1s" />
+              <path d="M250 115 Q350 130 480 155" stroke="rgba(255,149,0,0.4)" stroke-width="2" fill="none"
+                class="route-anim" style="animation-delay:1.5s" />
+            </svg>
+
+            <!-- Truck dots -->
+            <div id="truck-dots" style="position:absolute;inset:0;pointer-events:none"></div>
+
+            <!-- Cold chain alert -->
+            <div
+              style="position:absolute;top:10px;right:10px;background:rgba(255,71,87,.12);border:1px solid rgba(255,71,87,.3);border-radius:8px;padding:6px 10px;font-size:10px;font-family:var(--mono);color:var(--red);animation:tempWarn 1.5s infinite">
+              ⚠ DEL-44200: Temp 6.2°C / Max 4°C
+            </div>
+          </div>
+        </div>
+
+        <!-- Active Deliveries -->
+        <div class="card">
+          <div class="ch">
+            <div class="ct">📦 Active Deliveries</div>
+            <span class="si-badge ba" style="font-size:10px">47</span>
+          </div>
+          <div class="cb" id="del-list" style="max-height:230px"></div>
+        </div>
+      </div>
+
+      <!-- BOTTOM: Fleet + Cargo Categories + AI Insights -->
+      <div class="g3 fu d3">
+
+        <!-- Fleet Status -->
+        <div class="card">
+          <div class="ch">
+            <div class="ct">🚛 Fleet Status</div>
+            <span style="font-size:11px;color:var(--txt2)">38 / 45 online</span>
+          </div>
+          <div class="cb" style="padding:0;overflow-x:auto">
+            <table class="fleet-table">
+              <thead class="ft-head">
+                <tr>
+                  <th>Vehicle</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Load</th>
+                  <th>Driver</th>
+                </tr>
+              </thead>
+              <tbody class="ft-body" id="fleet-table"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Cargo Categories + Hourly -->
+        <div class="card">
+          <div class="ch">
+            <div class="ct">📊 Cargo by Category</div>
+          </div>
+          <div class="cb">
+            <div class="cat-list" id="cat-list"></div>
+            <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+              <div style="font-size:11px;font-weight:700;margin-bottom:8px">Revenue / Hour</div>
+              <div class="chart-h" id="freight-chart"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- AI Insights -->
+        <div class="card">
+          <div class="ch">
+            <div class="ct">🧠 AI Insights</div>
+            <span
+              style="font-size:10px;background:rgba(255,149,0,.1);color:var(--freight);padding:2px 8px;border-radius:5px;font-family:var(--mono)">NEXUS
+              CORE</span>
+          </div>
+          <div class="cb" id="ai-insights"></div>
+        </div>
+      </div>
+
+    </main>
+
+  </div>
+
+  <script>
+    // ── CLOCK ──────────────────────────────────────────────────
+    setInterval(() => { document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-US', { hour12: false }) + ' UTC' }, 1000);
+
+    // ── NAV ────────────────────────────────────────────────────
+    function setNav(el) { document.querySelectorAll('.si').forEach(i => i.classList.remove('on')); el.classList.add('on') }
+
+    // ── DELIVERIES ─────────────────────────────────────────────
+    const deliveries = [
+      { id: 'DEL-44210', cargo: 'Restaurant Equipment', from: 'Warehouse A', to: '123 Main St', status: 'transit', type: 'standard', weight: '280 kg', driver: 'Carlos M.', fare: 285.00, eta: '38 min' },
+      { id: 'DEL-44209', cargo: 'Pharmaceutical Supplies', from: 'Cold Hub Newark', to: 'Mount Sinai Hospital', status: 'cold', type: 'cold_chain', weight: '45 kg', driver: 'Kenji T.', fare: 420.00, eta: '22 min', temp: '3.1°C OK' },
+      { id: 'DEL-44208', cargo: 'Electronics Batch', from: 'FedEx Hub JFK', to: 'Best Buy Midtown', status: 'transit', type: 'express', weight: '120 kg', driver: 'Amara S.', fare: 180.00, eta: '55 min' },
+      { id: 'DEL-44207', cargo: 'Fresh Produce', from: 'Hunts Point Market', to: 'Whole Foods SoHo', status: 'cold', type: 'cold_chain', weight: '600 kg', driver: 'Riku P.', fare: 340.00, eta: '12 min', temp: '⚠ 6.2°C / Max 4°C' },
+      { id: 'DEL-44206', cargo: 'Office Furniture', from: 'Warehouse B Queens', to: 'WeWork Midtown', status: 'pickup', type: 'bulk', weight: '450 kg', driver: 'Tony D.', fare: 520.00, eta: 'Pickup 15 min' },
+      { id: 'DEL-44205', cargo: 'Courier Package', from: 'Client Drop-Off', to: '450 Park Ave', status: 'done', type: 'courier', weight: '2 kg', driver: 'Mia L.', fare: 28.00, eta: 'Delivered' },
+    ];
+
+    const statusMap = { transit: ['dt-transit', 'In Transit'], cold: ['dt-cold', 'Cold Chain'], pickup: ['dt-pickup', 'Pickup Soon'], done: ['dt-done', 'Delivered'], pending: ['dt-pending', 'Pending'] };
+    const typeIco = { standard: '📦', cold_chain: '❄️', express: '⚡', bulk: '🏗️', courier: '📩' };
+
+    document.getElementById('del-list').innerHTML = deliveries.map(d => {
+      const [cls, lbl] = statusMap[d.status] || statusMap.pending;
+      const tempHtml = d.temp ? `<div class="temp-badge ${d.temp.includes('⚠') ? 'temp-alert' : 'temp-ok'}">🌡 ${d.temp}</div>` : '';
+      return `
+  <div class="del-item">
+    <div class="di-top">
+      <span class="di-id">${d.id}</span>
+      <span class="di-tag ${cls}">${typeIco[d.type] || '📦'} ${lbl}</span>
+    </div>
+    <div class="di-cargo">${d.cargo}</div>
+    <div class="di-route">${d.from} → ${d.to}</div>
+    ${tempHtml}
+    <div class="di-meta">
+      <span>👤 ${d.driver} · ${d.weight}</span>
+      <div style="display:flex;gap:10px"><span>${d.eta}</span><span class="di-fare">$${d.fare.toFixed(2)}</span></div>
+    </div>
+  </div>`;
+    }).join('');
+
+    // ── TRUCK DOTS ─────────────────────────────────────────────
+    const trucks = [
+      { l: 15, t: 35, c: 'var(--freight)' }, { l: 40, t: 52, c: 'var(--freight)' }, { l: 55, t: 25, c: 'var(--ice)' },
+      { l: 70, t: 68, c: 'var(--freight)' }, { l: 82, t: 38, c: 'var(--green)' }, { l: 25, t: 72, c: 'var(--freight)' },
+      { l: 62, t: 45, c: 'var(--ice)' }, { l: 88, t: 22, c: 'var(--freight)' },
+    ];
+    document.getElementById('truck-dots').innerHTML = trucks.map((t, i) => `
+  <div id="td${i}" style="position:absolute;left:${t.l}%;top:${t.t}%;font-size:16px;transform:translate(-50%,-50%);
+    filter:drop-shadow(0 0 6px ${t.c});transition:left 5s ease,top 5s ease;cursor:pointer" title="Truck active">🚛</div>
+`).join('');
+    setInterval(() => {
+      trucks.forEach((t, i) => {
+        t.l = Math.min(92, Math.max(5, t.l + (Math.random() - .5) * 4));
+        t.t = Math.min(85, Math.max(10, t.t + (Math.random() - .5) * 4));
+        const el = document.getElementById('td' + i);
+        if (el) { el.style.left = t.l + '%'; el.style.top = t.t + '%' }
+      });
+    }, 5000);
+
+    // ── FLEET TABLE ─────────────────────────────────────────────
+    const fleet = [
+      { id: 'TRK-001', type: '🚛 Large Truck', status: 'vs-on', 'stat': 'On Route', load: 85, driver: 'Carlos M.' },
+      { id: 'TRK-002', type: '❄️ Refrigerated', status: 'vs-on', 'stat': 'On Route', load: 60, driver: 'Kenji T.' },
+      { id: 'TRK-003', type: '📦 Medium Van', status: 'vs-avail', 'stat': 'Available', load: 0, driver: '—' },
+      { id: 'TRK-004', type: '🚛 Large Truck', status: 'vs-on', 'stat': 'On Route', load: 92, driver: 'Tony D.' },
+      { id: 'TRK-005', type: '❄️ Refrigerated', status: 'vs-on', 'stat': 'On Route', load: 75, driver: 'Riku P.' },
+      { id: 'TRK-006', type: '🏍 Motorcycle', status: 'vs-avail', 'stat': 'Available', load: 0, driver: '—' },
+      { id: 'TRK-007', type: '📦 Small Van', status: 'vs-maint', 'stat': 'Maintenance', load: 0, driver: '—' },
+    ];
+
+    document.getElementById('fleet-table').innerHTML = fleet.map(f => `
+  <tr>
+    <td style="font-family:var(--mono);font-size:11px;color:var(--txt2)">${f.id}</td>
+    <td>${f.type}</td>
+    <td><span class="veh-status ${f.status}">${f.stat}</span></td>
+    <td>
+      ${f.load > 0 ? `<div style="display:flex;align-items:center;gap:6px">
+        <div class="load-bar"><div class="load-fill" style="width:${f.load}%;background:${f.load > 85 ? 'var(--red)' : f.load > 60 ? 'var(--freight)' : 'var(--green)'}"></div></div>
+        <span style="font-size:10px;font-family:var(--mono)">${f.load}%</span>
+      </div>`: '<span style="color:var(--txt3);font-size:11px">—</span>'}
+    </td>
+    <td style="font-size:11px;color:var(--txt2)">${f.driver}</td>
+  </tr>
+`).join('');
+
+    // ── CARGO CATEGORIES ─────────────────────────────────────────
+    const cats = [
+      { ico: '🏭', name: 'Industrial / Equipment', val: 38, color: 'var(--freight)' },
+      { ico: '❄️', name: 'Cold Chain / Pharma', val: 22, color: 'var(--ice)' },
+      { ico: '📦', name: 'E-Commerce / Retail', val: 20, color: 'var(--purple)' },
+      { ico: '🍎', name: 'Fresh Food / Produce', val: 12, color: 'var(--green)' },
+      { ico: '📩', name: 'Express / Courier', val: 8, color: 'var(--blue)' },
+    ];
+    document.getElementById('cat-list').innerHTML = cats.map(c => `
+  <div class="cat-row">
+    <div class="cat-ico">${c.ico}</div>
+    <div class="cat-info">
+      <div class="cat-name" style="display:flex;justify-content:space-between"><span>${c.name}</span><span style="font-size:10px;font-family:var(--mono);color:var(--txt2)">${c.val}%</span></div>
+      <div class="cat-bar"><div class="cat-fill" style="width:${c.val * 2.5}%;background:${c.color}"></div></div>
+    </div>
+  </div>
+`).join('');
+
+    // ── REVENUE CHART ─────────────────────────────────────────────
+    const revHourly = [0, 0, 200, 300, 800, 1200, 1800, 2200, 2000, 2500, 2800, 3100, 2700, 3000, 3200, 3500, 3800, 4200, 3900, 3600, 3200, 2800, 2200, 1800];
+    const nowH = new Date().getHours();
+    const sliced = revHourly.slice(0, nowH + 1);
+    const maxR = Math.max(...sliced, 1);
+    document.getElementById('freight-chart').innerHTML = sliced.map((v, i) => {
+      const h = Math.max((v / maxR) * 90, 2);
+      const cur = i === nowH;
+      return `<div class="hb" style="height:${h}%;background:${cur ? 'var(--freight)' : 'rgba(255,149,0,0.3)'};${cur ? 'box-shadow:0 0 10px rgba(255,149,0,.4)' : ''}" data-v="$${(v / 1000).toFixed(1)}k"></div>`;
+    }).join('');
+
+    // ── AI INSIGHTS ───────────────────────────────────────────────
+    document.getElementById('ai-insights').innerHTML = `
+  <div class="ins-card" style="--ic:var(--freight)">
+    <div class="ins-title">🧠 LoadOptimizer Recommendation</div>
+    <div class="ins-desc">TRK-001 has 15% spare capacity. Suggest adding DEL-44211 (electronics, 42 kg) — same route, +$180 revenue, +7 min delay only.</div>
+    <div class="ins-meta">AI Confidence: 91% · Auto-propose to driver?</div>
+    <div style="display:flex;gap:6px;margin-top:8px">
+      <button style="flex:1;padding:6px;background:rgba(255,149,0,.12);color:var(--freight);border:none;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">✓ Accept</button>
+      <button style="flex:1;padding:6px;background:var(--dark3);color:var(--txt2);border:none;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">✗ Decline</button>
+    </div>
+  </div>
+
+  <div class="ins-card" style="--ic:var(--red)">
+    <div class="ins-title">🌡️ Cold Chain Alert — DEL-44207</div>
+    <div class="ins-desc">Temperature reading 6.2°C — above max 4°C for fresh produce. Driver Riku P. notified. ETA to destination: 12 min. Monitoring closely.</div>
+    <div class="ins-meta">Alert triggered 3 min ago · Auto-escalated to ops</div>
+  </div>
+
+  <div class="ins-card" style="--ic:var(--green)">
+    <div class="ins-title">📍 Route Optimization</div>
+    <div class="ins-desc">RouteIntelligence rerouted 4 trucks around I-95 incident. Avg delay saved: 23 min per truck. New ETAs recalculated and sent to clients.</div>
+    <div class="ins-meta">Executed automatically · 8 min ago</div>
+  </div>
+
+  <div class="ins-card" style="--ic:var(--ice)">
+    <div class="ins-title">❄️ Cold Fleet Utilization</div>
+    <div class="ins-desc">3 refrigerated units at 87% capacity avg. DemandOracle predicts +2 cold chain bookings in 2 hours. Recommending pre-positioning REF-003 to Cold Hub.</div>
+    <div class="ins-meta">Confidence: 88% · Tomorrow forecast: High demand</div>
+  </div>
+`;
+
+    // ── LIVE UPDATE ───────────────────────────────────────────────
+    setInterval(() => {
+      document.getElementById('k-transit').textContent = 44 + Math.floor(Math.random() * 6);
+      document.getElementById('k-trucks').textContent = 37 + Math.floor(Math.random() * 3);
+      document.getElementById('ts-del').textContent = 44 + Math.floor(Math.random() * 6);
+      document.getElementById('ts-rev').textContent = '$' + (21000 + Math.random() * 1000).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }, 5000);
+  </script>
+  <script src="nexus-client.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS - What Could Make It Even Better</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box}
+:root{
+  --void:#04060a;
+  --d1:#080c14;
+  --d2:#0e1420;
+  --d3:#141c2e;
+  --line:rgba(255,255,255,.08);
+  --w:#f0f3fa;
+  --w2:#8a95b0;
+  --w3:#3a4560;
+  --g1:#00ffc2;
+  --g2:#ff6b35;
+  --g3:#a78bfa;
+  --g4:#38bdf8;
+  --g6:#fbbf24;
+  --g7:#4ade80;
+  --g8:#fb923c;
+  --mono:'Fira Code',monospace;
+  --sans:'Familjen Grotesk',sans-serif;
+}
+html,body{margin:0;padding:0;min-height:100%;background:var(--void);color:var(--w);font-family:var(--sans)}
+.progress-bar{position:fixed;top:0;left:0;height:3px;width:100%;transform:scaleX(0);transform-origin:left;background:linear-gradient(90deg,var(--g1),var(--g3));z-index:1000}
+.hero{position:relative;padding:72px 56px 40px;text-align:center;overflow:hidden}
+.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 22% 26%,rgba(0,255,194,.08),transparent 60%),radial-gradient(ellipse 65% 45% at 80% 70%,rgba(167,139,250,.08),transparent 62%);pointer-events:none}
+.hero-tag{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;border:1px solid rgba(0,255,194,.24);background:rgba(0,255,194,.08);color:var(--g1);font:500 11px/1 var(--mono);letter-spacing:.08em}
+.hero-tag::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--g1);box-shadow:0 0 10px var(--g1);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.hero h1{margin:18px 0 14px;font-size:clamp(30px,5vw,62px);line-height:1.04;letter-spacing:-.03em}
+.hero h1 em{color:var(--g1);font-style:italic}
+.hero p{margin:0 auto;max-width:760px;color:var(--w2);line-height:1.6}
+.filter-row{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin:28px auto 0;padding:0 20px}
+.filter-btn{border:1px solid var(--w3);background:transparent;color:var(--w2);padding:9px 16px;border-radius:999px;font:500 13px/1 var(--sans);cursor:pointer;transition:.2s}
+.filter-btn:hover{border-color:var(--w2);color:var(--w)}
+.filter-btn.active{border-color:transparent;background:var(--btn-c,#fff);color:#000}
+.shell{max-width:1360px;margin:0 auto;padding:0 34px 80px}
+.section{padding-top:14px}
+.section.hidden{display:none}
+.sec-header{display:flex;align-items:center;gap:14px;padding-bottom:12px;border-bottom:1px solid var(--line);margin-bottom:18px}
+.sec-ico{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:22px;flex-shrink:0}
+.sec-title{font-size:20px;font-weight:700;letter-spacing:-.01em}
+.sec-sub{font:400 12px/1.3 var(--mono);color:var(--w2);margin-top:2px}
+.sec-count{margin-left:auto;border:1px solid;padding:4px 12px;border-radius:999px;font:500 12px/1 var(--mono)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
+.card{background:var(--d1);border:1px solid var(--line);border-radius:14px;padding:18px;position:relative;overflow:hidden;transition:.2s;opacity:0;transform:translateY(12px)}
+.card.in{opacity:1;transform:translateY(0)}
+.card::before{content:'';position:absolute;left:0;right:0;top:0;height:2px;background:var(--accent);opacity:.75}
+.card:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.18)}
+.card-top{display:flex;gap:12px;align-items:flex-start}
+.card-ico{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;font-size:19px;flex-shrink:0;background:color-mix(in srgb, var(--accent) 18%, transparent)}
+.card-name{font-size:15px;font-weight:700;margin:0 0 4px}
+.card-impact{display:inline-flex;padding:2px 8px;border-radius:6px;font:500 10px/1.2 var(--mono);letter-spacing:.06em}
+.card-desc{font-size:13px;color:var(--w2);line-height:1.6;margin:12px 0 14px}
+.card-bottom{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.07)}
+.ctags{display:flex;flex-wrap:wrap;gap:5px}
+.ctag{font:500 10px/1.1 var(--mono);padding:3px 7px;border-radius:5px;background:rgba(255,255,255,.06);color:var(--w2)}
+.effort{font:500 10px/1 var(--mono);color:var(--w3);white-space:nowrap}
+.big{grid-column:1/-1;background:linear-gradient(140deg,var(--d2),var(--d3));border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:22px;display:grid;grid-template-columns:1.2fr .8fr;gap:16px}
+.big h3{margin:8px 0 8px;font-size:23px;letter-spacing:-.02em}
+.big p{margin:0;color:var(--w2);line-height:1.6;font-size:13px}
+.big .tag{font:500 10px/1 var(--mono);letter-spacing:.1em;color:var(--accent)}
+.metrics{display:flex;gap:18px;flex-wrap:wrap;margin-top:14px}
+.metric strong{display:block;font:700 24px/1 var(--mono);color:var(--accent)}
+.metric span{font:500 10px/1.2 var(--mono);color:var(--w2)}
+.phase{background:rgba(255,255,255,.04);border-radius:10px;padding:10px 12px;font-size:12px}
+.phase + .phase{margin-top:8px}
+.phase b{display:block;margin-bottom:2px}
+.divider{height:1px;background:rgba(255,255,255,.06);margin:28px 0}
+.bottom{padding:44px 0 10px;text-align:center}
+.bottom h2{font-size:clamp(25px,4vw,36px);margin:0 0 10px}
+.bottom p{margin:0;color:var(--w2)}
+.imp-game{background:rgba(0,255,194,.12);color:var(--g1)}
+.imp-high{background:rgba(251,191,36,.13);color:var(--g6)}
+.imp-medium{background:rgba(56,189,248,.13);color:var(--g4)}
+.imp-critical{background:rgba(255,68,68,.14);color:#ff7f7f}
+
+@media (max-width:980px){
+  .hero{padding:58px 24px 30px}
+  .shell{padding:0 16px 52px}
+  .big{grid-template-columns:1fr}
+}
+@media (max-width:560px){
+  .sec-header{align-items:flex-start;flex-wrap:wrap}
+  .sec-count{margin-left:0}
+  .cards{grid-template-columns:1fr}
+  .filter-btn{font-size:12px;padding:8px 12px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+}
+</style>
+</head>
+<body>
+<div class="progress-bar" id="progress"></div>
+
+<header class="hero">
+  <div class="hero-tag">NEXUS LOGISTICS - ENHANCEMENT ROADMAP</div>
+  <h1>What Could Make <em>NEXUS</em> Unstoppable</h1>
+  <p>Fixed version with working filters, better mobile behavior, and cleaner interaction handling.</p>
+  <div class="filter-row" id="filters"></div>
+</header>
+
+<main class="shell" id="app"></main>
+
+<script>
+const FILTERS = [
+  { key: 'all', label: 'All Enhancements', color: 'var(--g1)' },
+  { key: 'ai', label: 'AI & Tech', color: 'var(--g1)' },
+  { key: 'ops', label: 'Operations', color: 'var(--g2)' },
+  { key: 'cx', label: 'Customer Experience', color: 'var(--g4)' },
+  { key: 'revenue', label: 'Revenue Growth', color: 'var(--g6)' },
+  { key: 'green', label: 'Sustainability', color: 'var(--g7)' },
+  { key: 'integration', label: 'Integrations', color: 'var(--g8)' },
+];
+
+const SECTIONS = [
+  {
+    id: 'sec-ai',
+    key: 'ai',
+    icon: '🧠',
+    color: 'var(--g1)',
+    title: 'Game-Changing AI Upgrades',
+    sub: 'Next-level intelligence that competitors cannot replicate',
+    big: {
+      tag: 'GAME CHANGER',
+      title: 'Autonomous Vehicle Integration',
+      desc: 'Integrate AV partners into dispatch as a fleet capability upgrade, not a full rewrite.',
+      metrics: [['-60%', 'Driver Cost'], ['24/7', 'Availability'], ['∞', 'Scale']],
+      phases: [
+        ['Phase 1: AV-Assist', 'Geofenced routes with remote supervision.'],
+        ['Phase 2: Full AV Rides', 'Driverless rides in approved city corridors.'],
+        ['Phase 3: AV Freight', 'Last-mile vans and highway trucking pilots.'],
+      ]
+    },
+    cards: [
+      ['🛸', 'Drone Delivery Network', 'GAME', 'AI assigns drone vs truck by distance, weight, weather, and airspace.', '18 months', ['drones', 'last-mile', 'hardware'], ['ai','ops','integration']],
+      ['🔮', 'Predictive Ordering', 'GAME', 'Forecast demand and prompt one-tap pre-booking before users place orders.', '4 months', ['ML', 'personalization', 'B2B'], ['ai','revenue']],
+      ['🎙️', 'Voice AI Booking Assistant', 'HIGH', 'Natural-language booking across app, speakers, and in-car systems.', '3 months', ['LLM', 'voice', 'accessibility'], ['ai','cx']],
+      ['🔬', 'AI Vehicle Health Predictor', 'HIGH', 'Predict maintenance failures from sensor signals and auto-schedule service.', '5 months', ['IoT', 'predictive', 'fleet'], ['ai','ops']],
+      ['👁️', 'Real-Time Dashcam AI', 'HIGH', 'Edge vision for drowsiness, safety incidents, and rapid evidence capture.', '6 months', ['vision', 'safety', 'edge-AI'], ['ai','ops']],
+      ['🌐', 'Cross-Division Synergy Engine', 'MEDIUM', 'Shift drivers between ride and freight tasks to reduce idle time.', '2 months', ['optimization', 'dispatch'], ['ai','ops','revenue']],
+      ['🧠', 'Demand Shock Forecaster', 'MEDIUM', 'Detect spikes early from weather, events, and traffic signals.', '6 weeks', ['forecasting', 'alerts'], ['ai','ops']],
+    ]
+  },
+  {
+    id: 'sec-cx',
+    key: 'cx',
+    icon: '👤',
+    color: 'var(--g4)',
+    title: 'Customer Experience',
+    sub: 'Features that create loyalty and word-of-mouth',
+    cards: [
+      ['🎮', 'Gamification & Loyalty 2.0', 'HIGH', 'Streaks, challenges, leaderboards, and referral chains.', '3 months', ['retention', 'growth'], ['cx','revenue']],
+      ['🤝', 'Group Ride Coordinator', 'HIGH', 'Multi-pickup group trip builder with auto split-billing.', '2 months', ['groups', 'split-pay'], ['cx','ops']],
+      ['💬', 'Masked Chat + Calls', 'MEDIUM', 'In-app anonymized messaging/calls with live translation.', '5 weeks', ['privacy', 'communication'], ['cx','integration']],
+      ['🎵', 'Personalized Ride Experience', 'MEDIUM', 'Saved preferences: music, temperature, quiet mode, accessibility.', '6 weeks', ['personalization', 'premium'], ['cx']],
+      ['📍', 'Live Package Sharing Portal', 'HIGH', 'No-app tracking links with ETA, updates, and delivery options.', '3 weeks', ['tracking', 'freight'], ['cx','ops']],
+      ['🧒', 'Unaccompanied Minor Service', 'HIGH', 'Vetted drivers, OTP handoff, and strict route controls.', '4 months', ['safety', 'family'], ['cx','ops']],
+      ['⭐', 'AI Review Intelligence', 'MEDIUM', 'Cluster review patterns and trigger proactive quality actions.', '6 weeks', ['NLP', 'quality'], ['cx','ai','ops']],
+    ]
+  },
+  {
+    id: 'sec-revenue',
+    key: 'revenue',
+    icon: '💰',
+    color: 'var(--g6)',
+    title: 'Revenue Growth Engines',
+    sub: 'New streams that compound over time',
+    big: {
+      tag: 'MASSIVE REVENUE',
+      title: 'NEXUS B2B Platform',
+      desc: 'Self-serve business integrations with API dispatch, billing, and branded tracking.',
+      metrics: [['x8', 'LTV vs Retail'], ['MRR', 'Recurring Revenue'], ['API', 'Monetization']],
+      phases: [
+        ['E-Commerce API', 'Connect stores and auto-create deliveries.'],
+        ['Auto Invoicing', 'Consolidated monthly billing and net terms.'],
+        ['White-Label Tracking', 'Enterprise-branded shipment experiences.'],
+      ]
+    },
+    cards: [
+      ['🏨', 'Hotel & Travel Partnerships', 'HIGH', 'Embed ride booking into airline and hotel journeys.', '3 months BD', ['partnerships', 'B2B2C'], ['revenue','integration']],
+      ['📱', 'NEXUS Ads', 'HIGH', 'Contextual in-app ads without selling user data.', '3 months', ['ads', 'privacy-first'], ['revenue','cx']],
+      ['🔑', 'NEXUS CORE SaaS Licensing', 'GAME', 'License dispatch/ETA intelligence to third-party fleets.', '4 months', ['SaaS', 'B2B'], ['revenue','ai']],
+      ['🏦', 'NEXUS Pay', 'HIGH', 'Driver payouts, cards, microloans, and tax tooling.', '8 months', ['fintech', 'retention'], ['revenue','ops']],
+      ['🛒', 'Freight Exchange Marketplace', 'GAME', 'Open bidding marketplace for third-party cargo capacity.', '6 months', ['marketplace', 'network-effects'], ['revenue','ops']],
+    ]
+  },
+  {
+    id: 'sec-green',
+    key: 'green',
+    icon: '🌱',
+    color: 'var(--g7)',
+    title: 'Sustainability & ESG',
+    sub: 'Build a measurable low-emission moat',
+    cards: [
+      ['⚡', 'EV Fleet Transition Program', 'CRITICAL', 'Incentivize EV adoption and prioritize clean vehicles in dispatch.', 'Ongoing', ['EV', 'ESG'], ['green','ops','revenue']],
+      ['🌍', 'Carbon Offset Integration', 'HIGH', 'Offer verified offsets and produce monthly CO2 reports.', '6 weeks', ['carbon', 'B2B'], ['green','cx']],
+      ['🚲', 'Micro-Mobility Last Mile', 'MEDIUM', 'Urban cargo-bike dispatch for sub-10kg zero-emission deliveries.', '3 months', ['micro-mobility'], ['green','ops']],
+      ['📊', 'Green Route Optimizer', 'MEDIUM', 'Prefer lower-emission routes when ETA impact is negligible.', '2 months', ['routing', 'emissions'], ['green','ai','ops']],
+    ]
+  },
+  {
+    id: 'sec-integration',
+    key: 'integration',
+    icon: '🔗',
+    color: 'var(--g8)',
+    title: 'Power Integrations',
+    sub: 'Connect NEXUS to existing infrastructure',
+    cards: [
+      ['🏙️', 'Smart City Integration', 'GAME', 'Traffic feeds and policy integrations for faster routing.', '12 months BD', ['government', 'moat'], ['integration','ops']],
+      ['🏥', 'Healthcare System Integration', 'CRITICAL', 'EHR booking, insurance billing, and compliance workflows.', '9 months', ['healthcare', 'HIPAA'], ['integration','revenue','ops']],
+      ['🌐', 'Customs & Cross-Border Freight', 'HIGH', 'AI-assisted customs documentation and pre-clearance flows.', '8 months', ['compliance', 'international'], ['integration','ops']],
+      ['🔐', 'Cargo Provenance Ledger', 'MEDIUM', 'Tamper-evident chain-of-custody for regulated cargo.', '6 months', ['provenance', 'audits'], ['integration','ops']],
+      ['🤖', 'Warehouse Robot Integration', 'MEDIUM', 'Synchronize ETAs with warehouse robotics to cut dwell time.', '5 months', ['robotics', 'WMS'], ['integration','ops']],
+    ]
+  }
+];
+
+function impactClass(impact) {
+  if (impact === 'GAME') return 'imp-game';
+  if (impact === 'HIGH') return 'imp-high';
+  if (impact === 'CRITICAL') return 'imp-critical';
+  return 'imp-medium';
+}
+
+function impactLabel(impact) {
+  if (impact === 'GAME') return 'GAME CHANGER';
+  return impact + ' IMPACT';
+}
+
+function renderFilters() {
+  const wrap = document.getElementById('filters');
+  wrap.innerHTML = FILTERS.map((f, i) => `
+    <button type="button" class="filter-btn ${i === 0 ? 'active' : ''}" data-filter="${f.key}" style="--btn-c:${f.color}" aria-pressed="${i===0}">${f.label}</button>
+  `).join('');
+}
+
+function renderSections() {
+  const app = document.getElementById('app');
+  app.innerHTML = SECTIONS.map((sec, index) => {
+    const cards = sec.cards.map(([ico, name, impact, desc, effort, tags, filters]) => `
+      <article class="card" style="--accent:${sec.color}" data-tags="${(filters || []).join(',')}">
+        <div class="card-top">
+          <div class="card-ico">${ico}</div>
+          <div>
+            <h3 class="card-name">${name}</h3>
+            <span class="card-impact ${impactClass(impact)}">${impactLabel(impact)}</span>
+          </div>
+        </div>
+        <p class="card-desc">${desc}</p>
+        <div class="card-bottom">
+          <div class="ctags">${tags.map(t => `<span class="ctag">${t}</span>`).join('')}</div>
+          <span class="effort">Effort: ${effort}</span>
+        </div>
+      </article>
+    `).join('');
+
+    const big = sec.big ? `
+      <article class="big" style="--accent:${sec.color}">
+        <div>
+          <div class="tag">★ ${sec.big.tag}</div>
+          <h3>${sec.big.title}</h3>
+          <p>${sec.big.desc}</p>
+          <div class="metrics">
+            ${sec.big.metrics.map(([v,l]) => `<div class="metric"><strong>${v}</strong><span>${l}</span></div>`).join('')}
+          </div>
+        </div>
+        <div>
+          ${sec.big.phases.map(([t,d]) => `<div class="phase"><b>${t}</b>${d}</div>`).join('')}
+        </div>
+      </article>
+    ` : '';
+
+    return `
+      <section class="section" id="${sec.id}" data-key="${sec.key}">
+        <div class="sec-header">
+          <div class="sec-ico" style="background:color-mix(in srgb, ${sec.color} 18%, transparent)">${sec.icon}</div>
+          <div>
+            <div class="sec-title" style="color:${sec.color}">${sec.title}</div>
+            <div class="sec-sub">${sec.sub}</div>
+          </div>
+          <div class="sec-count" style="color:${sec.color};border-color:color-mix(in srgb, ${sec.color} 35%, transparent)">${sec.cards.length + (sec.big ? 1 : 0)} features</div>
+        </div>
+        <div class="cards">${big}${cards}</div>
+      </section>
+      ${index < SECTIONS.length - 1 ? '<div class="divider"></div>' : ''}
+    `;
+  }).join('') + `
+    <section class="bottom">
+      <div class="hero-tag">30 ENHANCEMENTS IDENTIFIED</div>
+      <h2>Ready to Build Any of These?</h2>
+      <p>Pick a category and we can turn it into an implementation plan.</p>
+    </section>
+  `;
+}
+
+function applyFilter(filterKey) {
+  const sections = document.querySelectorAll('.section[data-key]');
+  sections.forEach(section => {
+    const show = filterKey === 'all'
+      || section.dataset.key === filterKey
+      || (filterKey === 'ops' && section.querySelector('.card[data-tags*="ops"]'));
+    section.classList.toggle('hidden', !show);
+    const divider = section.nextElementSibling;
+    if (divider && divider.classList.contains('divider')) {
+      divider.style.display = show ? '' : 'none';
+    }
+  });
+
+  // For ops filter, hide cards that are not ops-tagged.
+  if (filterKey === 'ops') {
+    document.querySelectorAll('.card[data-tags]').forEach(card => {
+      const isOps = card.dataset.tags.split(',').includes('ops');
+      card.style.display = isOps ? '' : 'none';
+    });
+    document.querySelectorAll('.big').forEach(big => big.style.display = 'none');
+  } else {
+    document.querySelectorAll('.card[data-tags], .big').forEach(el => el.style.display = '');
+  }
+
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    const active = btn.dataset.filter === filterKey;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+
+  updateVisibleCounts();
+}
+
+function updateVisibleCounts() {
+  document.querySelectorAll('.section[data-key]').forEach(section => {
+    if (section.classList.contains('hidden')) return;
+    const count = Array
+      .from(section.querySelectorAll('.card, .big'))
+      .filter(el => el.style.display !== 'none').length;
+    const badge = section.querySelector('.sec-count');
+    if (badge) badge.textContent = `${count} feature${count === 1 ? '' : 's'}`;
+  });
+}
+
+function setupEvents() {
+  const filters = document.getElementById('filters');
+  filters.addEventListener('click', (e) => {
+    const button = e.target.closest('button[data-filter]');
+    if (!button) return;
+    applyFilter(button.dataset.filter);
+  });
+
+  window.addEventListener('scroll', () => {
+    const total = document.documentElement.scrollHeight - window.innerHeight;
+    const ratio = total > 0 ? Math.min(window.scrollY / total, 1) : 0;
+    document.getElementById('progress').style.transform = `scaleX(${ratio})`;
+  }, { passive: true });
+}
+
+function animateCards() {
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const cards = document.querySelectorAll('.card');
+  if (reduce || !('IntersectionObserver' in window)) {
+    cards.forEach(c => c.classList.add('in'));
+    return;
+  }
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('in');
+        io.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.08 });
+  cards.forEach(c => io.observe(c));
+}
+
+renderFilters();
+renderSections();
+setupEvents();
+animateCards();
+applyFilter('all');
+</script>
+</body>
+</html>

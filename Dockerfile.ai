@@ -1,0 +1,15 @@
+FROM python:3.11-slim
+WORKDIR /app
+# Install dependencies according to requirements.txt
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt --index-url https://download.pytorch.org/whl/cpu \
+    && pip install --no-cache-dir fastapi uvicorn numpy aioredis httpx pydantic scikit-learn requests
+
+# Copy AI engine code
+COPY ai_engine.py .
+
+# Create models directory
+RUN mkdir -p /app/models
+
+EXPOSE 8001
+CMD ["uvicorn", "ai_engine:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "2"]
