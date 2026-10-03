@@ -11,11 +11,13 @@
   // Config & API Endpoint Resolution
   const params = new URLSearchParams(window.location.search);
   const DEFAULT_PORT = 3000;
-  const API_HOST = params.get('api') || window.location.origin.includes(':80') || window.location.origin.includes(':443')
-    ? window.location.origin
-    : (window.location.port === '' || window.location.port === '80' || window.location.port === '443')
-      ? window.location.origin
-      : `http://${window.location.hostname || 'localhost'}:${DEFAULT_PORT}`;
+  const isLocalHost = ['localhost', '127.0.0.1', ''].includes(window.location.hostname);
+  const API_HOST = params.get('api') || (window.location.protocol === 'file:'
+    ? 'http://localhost:3000'
+    : isLocalHost && window.location.port && window.location.port !== '3000'
+      ? `${window.location.protocol}//${window.location.hostname}:${DEFAULT_PORT}`
+      : window.location.origin);
+
 
   const state = {
     connected: false,
@@ -350,7 +352,7 @@
 
     state.connected = false;
     state.backendMode = 'SIMULATION';
-    updateHUDStatus(false, 'DEMO SIMULATION (API Offline)');
+    updateHUDStatus(false, 'DEMO PREVIEW · SAMPLE DATA');
     return false;
   }
 
@@ -486,6 +488,16 @@
       onConfirm(backdrop);
     };
   }
+
+  // Prevent the preview from claiming that an operation was performed.
+  document.addEventListener('click', (event) => {
+    const action = event.target.closest('#btn-request-ride, #btn-quote-freight, #btn-cold-chain, #btn-rebalance-fleet');
+    if (action && !state.connected) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      showToast('Demo preview', 'Sample data only. Connect the backend to book rides, quote freight, or update the fleet.', 'info', 'ℹ️');
+    }
+  }, true);
 
   // ─── ACTIONS WIRE-UP ───────────────────────────────────────────────
   document.getElementById('btn-request-ride').onclick = () => {
@@ -681,8 +693,7 @@
   };
 
   // ─── INITIALIZATION ────────────────────────────────────────────────
-  checkBackend();
-  initSocket();
+  checkBackend().then((connected) => { if (connected) initSocket(); });
 
   // Poll backend every 8 seconds if socket disconnects
   setInterval(() => {

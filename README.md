@@ -30,3 +30,22 @@ NEXUS Logistics operates two verticals (NEXUS RIDE and NEXUS FREIGHT) using a sh
 - Live alerts and surge zone monitoring
 
 *Move Everything. Intelligently.*
+
+## Cloudflare dashboard preview
+
+The Cloudflare Worker serves `frontend/` as a demo preview. The Docker API,
+Python AI engine, PostgreSQL, Redis, and Kafka are separate services and are
+not deployed by this command. API requests return an explicit 503 until a
+backend is connected. The dashboard labels sample data and blocks backend
+actions while offline.
+
+Workers Builds settings:
+
+- Root directory: `/`
+- Build variable: `SKIP_DEPENDENCY_INSTALL=true`
+- Build command: `npm ci --ignore-scripts`
+- Deploy command: `npm run deploy`
+
+Local packaging check: `npm run deploy:check`.
+Connect an independently hosted API using `?api=https://your-api-host` (the
+API must permit this dashboard origin through CORS).

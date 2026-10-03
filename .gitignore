@@ -55,3 +55,5 @@ Thumbs.db
 !.env.example
 ssl/*.key
 ssl/*.pem
+
+.wrangler/

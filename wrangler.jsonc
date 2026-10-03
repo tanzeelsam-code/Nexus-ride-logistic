@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "nexus-ride-logistic",
+  "account_id": "106f1cbc0fbab8fa5ecb3dd04baf2019",
+  "main": "cloudflare/worker.mjs",
+  "compatibility_date": "2026-10-03",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./frontend",
+    "binding": "ASSETS",
+    "run_worker_first": [
+      "/api/*",
+      "/socket.io/*"
+    ]
+  },
+  "observability": {
+    "enabled": true,
+    "traces": {
+      "enabled": true
+    }
+  }
+}
