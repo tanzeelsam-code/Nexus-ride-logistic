@@ -57,3 +57,9 @@ ssl/*.key
 ssl/*.pem
 
 .wrangler/
+
+# Android
+.gradle/
+android/**/build/
+android/local.properties
+*.keystore

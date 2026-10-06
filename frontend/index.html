@@ -1530,6 +1530,19 @@
       { type: 'info', icon: '🧠', title: 'AI Model Update', desc: 'ETA Prophet v4.1 deployed. +2.3% accuracy improvement on rush-hour predictions.', time: '28 min ago' },
     ];
 
+    // ─── LIVE DATA BRIDGE ─────────────────────────────────────────
+    // nexus-client.js sets window.NexusLive. When it is live the page shows real numbers;
+    // otherwise it keeps the labelled sample-data simulation.
+    const escapeHtml = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const isLive = () => !!(window.NexusLive && window.NexusLive.live && window.NexusLive.overview);
+
+    function timeAgo(ts) {
+      const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+      if (s < 60) return 'Just now';
+      if (s < 3600) return Math.round(s / 60) + ' min ago';
+      return Math.round(s / 3600) + ' h ago';
+    }
+
     // ─── RENDER LIVE PANEL ────────────────────────────────────────
     function statusClass(s) {
       const map = {
@@ -1551,46 +1564,72 @@
       return map[s] || s;
     }
 
+    let currentPanelType = 'trips';
     function renderLivePanel(type = 'trips') {
       const panel = document.getElementById('live-panel');
 
+      currentPanelType = type;
+      const live = isLive();
+      const ov = live ? window.NexusLive.overview : null;
+
       if (type === 'alerts') {
-        panel.innerHTML = mockAlerts.map(a => `
-      <div class="alert-item alert-${a.type} slide-in">
-        <div class="alert-icon">${a.icon}</div>
+        const alerts = live ? (window.mockAlerts || ov.alerts || []) : mockAlerts;
+        if (live && alerts.length === 0) {
+          panel.innerHTML = '<div style="padding:16px;color:var(--text3);font-size:12px;">No alerts.</div>';
+          return;
+        }
+        panel.innerHTML = alerts.map(a => `
+      <div class="alert-item alert-${escapeHtml(a.type)} slide-in">
+        <div class="alert-icon">${escapeHtml(a.icon)}</div>
         <div class="alert-body">
-          <div class="alert-title">${a.title}</div>
-          <div style="font-size:11px;color:var(--text2);margin:3px 0 4px;">${a.desc}</div>
-          <div class="alert-meta">${a.time}</div>
+          <div class="alert-title">${escapeHtml(a.title)}</div>
+          <div style="font-size:11px;color:var(--text2);margin:3px 0 4px;">${escapeHtml(a.desc)}</div>
+          <div class="alert-meta">${escapeHtml(a.timestamp ? timeAgo(a.timestamp) : a.time)}</div>
         </div>
       </div>
     `).join('');
         return;
       }
 
-      const data = type === 'freight' ? mockDeliveries : mockTrips;
+      let data = type === 'freight' ? mockDeliveries : mockTrips;
+      if (live) {
+        data = (type === 'freight' ? ov.deliveries : ov.trips).map(t => ({
+          id: t.ref,
+          from: t.from,
+          to: t.to,
+          status: t.status,
+          driver: t.driver && t.driver.trim() !== 'null' ? t.driver : null,
+          fare: t.fare,
+          weight: t.weight ? Number(t.weight) + ' kg' : '',
+          eta: t.eta_min ? Math.round(t.eta_min) + ' min pickup' : '',
+        }));
+        if (data.length === 0) {
+          panel.innerHTML = '<div style="padding:16px;color:var(--text3);font-size:12px;">No active ' + (type === 'freight' ? 'deliveries' : 'trips') + ' right now.</div>';
+          return;
+        }
+      }
 
       panel.innerHTML = data.map(t => `
     <div class="trip-item slide-in">
       <div class="trip-header">
-        <span class="trip-id">${t.id}</span>
+        <span class="trip-id">${escapeHtml(t.id)}</span>
         <span class="trip-status ${statusClass(t.status)}">${statusLabel(t.status)}</span>
       </div>
       <div class="trip-route">
         <div class="trip-route-item">
           <span class="route-dot-pick">●</span>
-          <span>${t.from}</span>
+          <span>${escapeHtml(t.from)}</span>
         </div>
         <div class="trip-route-item">
           <span class="route-dot-drop">●</span>
-          <span>${t.to}</span>
+          <span>${escapeHtml(t.to)}</span>
         </div>
       </div>
       <div class="trip-footer">
-        <span>${t.driver ? '👤 ' + t.driver : '<span style="color:var(--accent4)">AI searching...</span>'}</span>
+        <span>${t.driver ? '👤 ' + escapeHtml(t.driver) : '<span style="color:var(--accent4)">AI searching...</span>'}</span>
         <div style="display:flex;gap:12px;align-items:center;">
-          ${t.weight ? `<span style="font-family:var(--mono);font-size:10px;color:var(--text3);">${t.weight}</span>` : ''}
-          <span style="font-size:10px;color:var(--text3);font-family:var(--mono);">${t.eta}</span>
+          ${t.weight ? `<span style="font-family:var(--mono);font-size:10px;color:var(--text3);">${escapeHtml(t.weight)}</span>` : ''}
+          <span style="font-size:10px;color:var(--text3);font-family:var(--mono);">${escapeHtml(t.eta)}</span>
           <span class="trip-fare">$${parseFloat(t.fare).toFixed(2)}</span>
         </div>
       </div>
@@ -1721,8 +1760,48 @@
 `).join('');
 
     // ─── LIVE DATA UPDATES ─────────────────────────────────────────
+    function applyLiveOverview() {
+      const ov = window.NexusLive.overview;
+      const m = ov.metrics;
+      animateNumber('m-active', m.active_trips);
+      animateNumber('m-deliveries', m.active_deliveries);
+      document.getElementById('m-drivers').innerHTML = ov.fleet.online_total + '<span class="metric-unit">online</span>';
+      document.getElementById('m-rev-num').textContent = Number(m.today_revenue || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
+      document.getElementById('queue-count').textContent = ov.trips.filter(t => t.status === 'searching').length + ov.deliveries.filter(d => d.status === 'pending').length;
+      document.getElementById('active-trips-badge').textContent = m.active_trips;
+      document.getElementById('active-del-badge').textContent = m.active_deliveries;
+      const score = m.dispatch_ai_score_pct;
+      document.getElementById('ai-dispatch').textContent = score == null ? '—' : score.toFixed(1) + '%';
+      document.getElementById('ai-eta').textContent = m.avg_eta_minutes == null ? '—' : m.avg_eta_minutes.toFixed(1) + ' min';
+      const aiBig = document.getElementById('m-ai');
+      if (aiBig) aiBig.innerHTML = (score == null ? '—' : Math.round(score)) + '<span class="metric-unit">%</span>';
+      renderLivePanel(currentPanelType);
+      renderLiveDrivers(ov.fleet.drivers);
+    }
+
+    // Place real drivers on the map card by scaling their coordinates into the card.
+    function renderLiveDrivers(drivers) {
+      const pts = drivers.filter(d => d.is_online && d.lat != null && d.lng != null);
+      if (!pts.length) { overlay.innerHTML = ''; return; }
+      const lats = pts.map(d => d.lat), lngs = pts.map(d => d.lng);
+      const minLat = Math.min(...lats), maxLat = Math.max(...lats), minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+      const spanLat = Math.max(maxLat - minLat, 0.01), spanLng = Math.max(maxLng - minLng, 0.01);
+      overlay.innerHTML = pts.map(d => {
+        const left = 8 + ((d.lng - minLng) / spanLng) * 84;
+        const top = 8 + (1 - (d.lat - minLat) / spanLat) * 80;
+        const kind = d.mode === 'freight' ? 'freight' : 'taxi';
+        return `<div class="driver-dot ${kind} ${d.status === 'on_trip' ? 'on-trip' : ''}" title="${escapeHtml(d.name)}" style="left:${left}%;top:${top}%;"></div>`;
+      }).join('');
+    }
+
+    window.addEventListener('nexus:data', () => {
+      if (isLive()) applyLiveOverview();
+      else renderLivePanel(currentPanelType);
+    });
+
     function updateMetrics() {
-      // Simulate live updates
+      if (isLive()) return;     // live numbers arrive through the nexus:data event
+      // Simulate live updates (sample-data preview only)
       const active = 26 + Math.floor(Math.random() * 6);
       const del = 12 + Math.floor(Math.random() * 5);
       const drivers = 138 + Math.floor(Math.random() * 10);
@@ -1758,6 +1837,7 @@
 
     // Animate driver dots
     function animateDrivers() {
+      if (isLive()) return;
       const dots = document.querySelectorAll('.driver-dot');
       dots.forEach(dot => {
         const newLeft = parseFloat(dot.style.left) + (Math.random() - 0.5) * 2;

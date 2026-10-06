@@ -24,13 +24,38 @@
     backendMode: 'CHECKING',
     activeTripsCount: 0,
     activeDeliveriesCount: 0,
-    onlineDrivers: 165,
+    onlineDrivers: 0,
     socket: null,
     fleetData: null,
     coldChainData: null,
     diurnalData: null,
     alertsQueue: [],
+    authRequired: false,
   };
+
+  // Shared with the dashboard page: it renders live data when `live` is true, sample data otherwise.
+  window.NexusLive = { live: false, overview: null };
+  function publishLive(data) {
+    window.NexusLive.live = !!data && !data.demo;
+    window.NexusLive.overview = data || null;
+    window.dispatchEvent(new CustomEvent('nexus:data'));
+  }
+
+  // Ops sign-in: the ops endpoints and socket require an ops/admin token.
+  const TOKEN_KEY = 'nexus_ops_token';
+  function getToken() {
+    try { return sessionStorage.getItem(TOKEN_KEY); } catch { return null; }
+  }
+  function setToken(token) {
+    try { token ? sessionStorage.setItem(TOKEN_KEY, token) : sessionStorage.removeItem(TOKEN_KEY); } catch { /* storage unavailable */ }
+  }
+  function apiFetch(path, options = {}) {
+    const token = getToken();
+    const headers = { ...(options.headers || {}) };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    return fetch(`${API_HOST}${path}`, { ...options, headers });
+  }
+  const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   // ─── STYLES INJECTION ──────────────────────────────────────────────
   const hudStyles = document.createElement('style');
@@ -333,17 +358,28 @@
   // ─── API CLIENT & SYNC ─────────────────────────────────────────────
   async function checkBackend() {
     try {
-      const res = await fetch(`${API_HOST}/api/v1/ops/overview`, { method: 'GET' });
+      const res = await apiFetch('/api/v1/ops/overview');
+      if (res.status === 401 || res.status === 403) {
+        setToken(null);
+        state.connected = false;
+        state.authRequired = true;
+        state.backendMode = 'AUTH';
+        updateHUDStatus(false, 'SIGN IN REQUIRED · OPS ACCESS');
+        if (!state.loginShown) { state.loginShown = true; promptOpsLogin(); }
+        return false;
+      }
       if (res.ok) {
         const data = await res.json();
         state.connected = true;
-        state.backendMode = 'LIVE';
+        state.authRequired = false;
+        state.backendMode = data.demo ? 'SIMULATION' : 'LIVE';
         state.fleetData = data.fleet;
         state.coldChainData = data.cold_chain;
         state.diurnalData = data.diurnal;
 
-        updateHUDStatus(true, `API LIVE (${API_HOST.replace(/^https?:\/\//, '')})`);
+        updateHUDStatus(!data.demo, data.demo ? 'API UP · SAMPLE FLEET (no database)' : `API LIVE (${API_HOST.replace(/^https?:\/\//, '')})`);
         applyLiveDataToDashboard(data);
+        publishLive(data);
         return true;
       }
     } catch (e) {
@@ -352,6 +388,7 @@
 
     state.connected = false;
     state.backendMode = 'SIMULATION';
+    publishLive(null);
     updateHUDStatus(false, 'DEMO PREVIEW · SAMPLE DATA');
     return false;
   }
@@ -379,7 +416,7 @@
     // Update KPI counters across all dashboard variations
     const elemActiveTrips = document.getElementById('k-active') || document.getElementById('active-trips-count');
     if (elemActiveTrips && data.metrics?.active_trips !== undefined) {
-      elemActiveTrips.textContent = data.metrics.active_trips + 28;
+      elemActiveTrips.textContent = data.metrics.active_trips;
     }
 
     const elemOnlineDrivers = document.getElementById('k-drivers') || document.getElementById('online-drivers-count');
@@ -394,12 +431,12 @@
 
     // Diurnal HUD metrics
     const diurnalMetric = document.getElementById('hud-diurnal-metric');
-    if (diurnalMetric && data.fleet) {
-      const total = data.fleet.online_total || 165;
-      const ridePct = Math.round(((data.fleet.ride_only || 58) / total) * 100);
-      const freightPct = Math.round(((data.fleet.freight_only || 42) / total) * 100);
+    if (diurnalMetric && data.fleet && data.fleet.online_total > 0) {
+      const total = data.fleet.online_total;
+      const ridePct = Math.round(((data.fleet.ride_only || 0) / total) * 100);
+      const freightPct = Math.round(((data.fleet.freight_only || 0) / total) * 100);
       const dualPct = 100 - ridePct - freightPct;
-      diurnalMetric.textContent = `🚕 ${ridePct}% Rides · 📦 ${freightPct}% Freight · ❄️ ${dualPct}% Cold`;
+      diurnalMetric.textContent = `🚕 ${ridePct}% Rides · 📦 ${freightPct}% Freight · 🔀 ${dualPct}% Dual-mode`;
     }
 
     // Update live alert stream if alerts exist
@@ -417,8 +454,12 @@
         state.socket = socket;
 
         socket.on('connect', () => {
-          socket.emit('ops:join');
+          socket.emit('ops:join', { token: getToken() });
           updateHUDStatus(true, `LIVE STREAM CONNECTED`);
+        });
+
+        socket.on('ops:error', () => {
+          updateHUDStatus(false, 'LIVE STREAM DENIED · SIGN IN AGAIN');
         });
 
         socket.on('ops:joined', (info) => {
@@ -428,6 +469,10 @@
         socket.on('ops:heartbeat', (data) => {
           if (data && data.drivers) {
             state.fleetData = data;
+            if (window.NexusLive.overview) {
+              window.NexusLive.overview.fleet = { ...window.NexusLive.overview.fleet, drivers: data.drivers };
+              window.dispatchEvent(new CustomEvent('nexus:data'));
+            }
           }
         });
 
@@ -495,14 +540,56 @@
     if (action && !state.connected) {
       event.preventDefault();
       event.stopImmediatePropagation();
+      if (state.authRequired) { promptOpsLogin(); return; }
       showToast('Demo preview', 'Sample data only. Connect the backend to book rides, quote freight, or update the fleet.', 'info', 'ℹ️');
     }
   }, true);
 
+  function promptOpsLogin() {
+    showModal(
+      'Operations Sign-in',
+      '🔐',
+      `
+      <div class="nexus-form-group">
+        <label class="nexus-form-label">Ops / admin email</label>
+        <input class="nexus-form-input" id="ops-email" type="email" autocomplete="username" />
+      </div>
+      <div class="nexus-form-group">
+        <label class="nexus-form-label">Password</label>
+        <input class="nexus-form-input" id="ops-pass" type="password" autocomplete="current-password" />
+      </div>
+      <div id="ops-login-error" style="font-size:11px;color:#ff6b6b;min-height:14px"></div>
+    `,
+      async (modal) => {
+        const errBox = modal.querySelector('#ops-login-error');
+        try {
+          const res = await fetch(`${API_HOST}/api/v1/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: modal.querySelector('#ops-email').value, password: modal.querySelector('#ops-pass').value }),
+          });
+          const data = await res.json();
+          if (!res.ok) { errBox.textContent = data.error || 'Sign-in failed'; return; }
+          if (!['admin', 'ops'].includes(data.user?.role)) { errBox.textContent = 'This account has no operations access.'; return; }
+          setToken(data.token);
+          modal.remove();
+          state.loginShown = false;
+          if (await checkBackend()) {
+            if (state.socket) state.socket.disconnect();
+            initSocket();
+          }
+        } catch {
+          errBox.textContent = 'Could not reach the API.';
+        }
+      },
+      'Sign in'
+    );
+  }
+
   // ─── ACTIONS WIRE-UP ───────────────────────────────────────────────
   document.getElementById('btn-request-ride').onclick = () => {
     showModal(
-      'Request NEXUS RIDE',
+      'Price a NEXUS RIDE trip',
       '🚕',
       `
       <div class="nexus-form-group">
@@ -529,30 +616,36 @@
         const to = modal.querySelector('#r-to').value;
         const type = modal.querySelector('#r-type').value;
 
-        showToast('Dispatching Driver...', `Searching nearest available driver for ${type.toUpperCase()}...`, 'info', '🧠');
         modal.remove();
 
         try {
-          const res = await fetch(`${API_HOST}/api/v1/trips/estimate`, {
+          const res = await apiFetch('/api/v1/trips/estimate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               pickup_lat: 40.7580,
               pickup_lng: -73.9855,
+              pickup_address: from,
               dropoff_lat: 40.6413,
               dropoff_lng: -73.7781,
+              dropoff_address: to,
               service_type: type
             })
           });
-          const pricing = res.ok ? await res.json() : null;
-          const fare = pricing?.breakdown?.total_fare || (type === 'luxury' ? 68.50 : 42.20);
-
-          showToast('Driver Assigned!', `Marcus B. (Tesla Model 3, ★4.92) is en route. Fare: $${fare}. ETA: 3.5 min.`, 'success', '✅');
-        } catch {
-          showToast('Driver Assigned (Demo)', 'Elena V. (Sedan, ★4.95) assigned via AI CORE. ETA: 4 min.', 'success', '🚕');
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Estimate failed');
+          const est = data.price_estimate;
+          showToast(
+            `Fare estimate: $${est.total_fare}`,
+            `${esc(from)} → ${esc(to)} · surge ×${est.surge_multiplier}. Riders book from the rider app; this console only prices trips.`,
+            'success',
+            '🚕'
+          );
+        } catch (err) {
+          showToast('Estimate failed', esc(err.message || 'Could not reach the pricing service.'), 'critical', '⚠️');
         }
       },
-      '⚡ Dispatch via AI Core'
+      'Get fare estimate'
     );
   };
 
@@ -605,17 +698,16 @@
             })
           });
 
-          if (res.ok) {
-            const q = await res.json();
-            showToast(
-              `Freight Quote Ready: $${q.breakdown.total_fare}`,
-              `Vehicle: ${q.recommended_vehicle.toUpperCase()} · Distance: ${q.distance_km} km · ETA: ${q.estimated_transit_hours} hrs. SLA Guaranteed.`,
-              'success',
-              '📦'
-            );
-          }
-        } catch {
-          showToast('Quote Generated (Demo)', `Estimated Fare: $104.50 (Cold Chain + Insurance). Assigned Reefer Van REF-02.`, 'success', '📦');
+          if (!res.ok) throw new Error((await res.json()).error || 'Quote failed');
+          const q = await res.json();
+          showToast(
+            `Freight Quote Ready: $${q.breakdown.total_fare}`,
+            `Vehicle: ${esc(q.recommended_vehicle.toUpperCase())} · Distance: ${q.distance_km} km · ETA: ${q.estimated_transit_hours} hrs.`,
+            'success',
+            '📦'
+          );
+        } catch (err) {
+          showToast('Quote failed', esc(err.message || 'Could not reach the quoting service.'), 'critical', '⚠️');
         }
       },
       'Get Instant SLA Quote'
@@ -651,7 +743,7 @@
         modal.remove();
 
         try {
-          const res = await fetch(`${API_HOST}/api/v1/cold-chain/telemetry`, {
+          const res = await apiFetch('/api/v1/cold-chain/telemetry', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -662,43 +754,43 @@
             })
           });
           const result = await res.json();
+          if (!res.ok) throw new Error(result.error || 'Telemetry rejected');
           if (result.is_excursion) {
-            showToast('🚨 EXCURSION DETECTED', result.alert.desc, 'critical', '🌡️');
+            showToast('🚨 EXCURSION DETECTED', esc(result.alert.desc), 'critical', '🌡️');
           } else {
-            showToast('Sensor Telemetry Ingested', `Temperature ${temp}°C within certified safe range.`, 'success', '❄️');
+            showToast('Sensor Telemetry Ingested', `Temperature ${temp}°C within the shipment's safe range.`, 'success', '❄️');
           }
-        } catch {
-          if (temp > 6.0) {
-            showToast('🚨 EXCURSION DETECTED (Simulated)', `Temperature reading ${temp}°C exceeds safety limit! Driver alerted.`, 'critical', '🌡️');
-          } else {
-            showToast('Sensor Logged', `Temp ${temp}°C logged to TimescaleDB.`, 'success', '❄️');
-          }
+        } catch (err) {
+          showToast('Telemetry failed', esc(err.message || 'Could not reach the API.'), 'critical', '⚠️');
         }
       },
       'Broadcast Sensor Reading'
     );
+    // Offer the shipments that are actually being monitored right now.
+    apiFetch('/api/v1/cold-chain/shipments').then((r) => r.ok ? r.json() : null).then((data) => {
+      const select = document.getElementById('cc-shipment');
+      if (!select || !data || !data.shipments.length) return;
+      select.innerHTML = data.shipments.map((sh) =>
+        `<option value="${esc(sh.id)}">${esc(sh.id)} (${esc(sh.cargo || 'cargo')}${sh.min_temp_c != null ? ` — Target: ${esc(sh.min_temp_c)}°C–${esc(sh.max_temp_c)}°C` : ''})</option>`
+      ).join('');
+    }).catch(() => {});
   };
 
   document.getElementById('btn-rebalance-fleet').onclick = async () => {
     showToast('Executing AI Rebalancer...', 'Analyzing diurnal demand curves between rides and freight...', 'info', '🧠');
     try {
-      const res = await fetch(`${API_HOST}/api/v1/fleet/rebalance`);
-      if (res.ok) {
-        const data = await res.json();
-        showToast('Fleet Rebalanced', data.reasoning, 'success', '🔄');
-      }
-    } catch {
-      showToast('Diurnal Rebalance (Demo)', 'Shifted 18 off-peak sedan drivers to midday e-commerce parcel pickup. Deadhead miles reduced -34.8%.', 'success', '🔄');
+      const res = await apiFetch('/api/v1/fleet/rebalance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Rebalance failed');
+      showToast('Fleet Rebalanced', esc(data.reasoning), 'success', '🔄');
+    } catch (err) {
+      showToast('Rebalance failed', esc(err.message || 'Could not reach the API.'), 'critical', '⚠️');
     }
   };
 
   // ─── INITIALIZATION ────────────────────────────────────────────────
   checkBackend().then((connected) => { if (connected) initSocket(); });
 
-  // Poll backend every 8 seconds if socket disconnects
-  setInterval(() => {
-    if (!state.connected || !state.socket?.connected) {
-      checkBackend();
-    }
-  }, 8000);
+  // Refresh KPIs every 10 seconds (also recovers from a dropped connection)
+  setInterval(() => { checkBackend(); }, 10000);
 })();
