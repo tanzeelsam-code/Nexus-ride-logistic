@@ -13,9 +13,10 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: nexusdb
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      # timescaledb-ha keeps its data in /home/postgres/pgdata, not /var/lib/postgresql/data
+      - postgres_data:/home/postgres/pgdata
       - ./database_schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U nexus -d nexusdb" ]
@@ -34,7 +35,7 @@ services:
     container_name: nexus-redis
     command: redis-server --requirepass ${REDIS_PASSWORD} --maxmemory 2gb --maxmemory-policy allkeys-lru
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -42,9 +43,12 @@ services:
       interval: 10s
 
   # ── Kafka + Zookeeper ─────────────────────────────────────────
+  # Optional event streaming. The API does not use Kafka yet, so it only starts with:
+  #   docker compose --profile streaming up
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.0
     container_name: nexus-zookeeper
+    profiles: [ "streaming" ]
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
@@ -52,9 +56,10 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.4.0
     container_name: nexus-kafka
+    profiles: [ "streaming" ]
     depends_on: [ zookeeper ]
     ports:
-      - "9092:9092"
+      - "127.0.0.1:9092:9092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -75,9 +80,8 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
-      kafka: { condition: service_healthy }
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${NODE_ENV:-production}
       PORT: 3000
       DB_HOST: postgres
       DB_PASSWORD: ${DB_PASSWORD}
@@ -88,16 +92,20 @@ services:
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
       MAPBOX_API_KEY: ${MAPBOX_API_KEY}
       AI_ENGINE_URL: http://ai-engine:8001
-      KAFKA_BROKERS: kafka:29092
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      IOT_DEVICE_KEY: ${IOT_DEVICE_KEY:-}
       LOG_LEVEL: info
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:3000/health" ]
-      interval: 30s
-      timeout: 10s
+      test: [ "CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/health" ]
+      interval: 15s
+      timeout: 5s
       retries: 3
+      start_period: 20s
 
   # ── AI Engine ─────────────────────────────────────────────────
   ai-engine:
@@ -112,14 +120,18 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       WEATHER_API_KEY: ${WEATHER_API_KEY}
       MAPBOX_API_KEY: ${MAPBOX_API_KEY}
-    ports:
-      - "8001:8001"
+    # Internal only: reached by the API as http://ai-engine:8001, never published to the host.
+    expose:
+      - "8001"
     restart: unless-stopped
     volumes:
       - model_cache:/app/models
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8001/health" ]
-      interval: 30s
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
     deploy:
       resources:
         limits:
@@ -130,7 +142,8 @@ services:
   nginx:
     image: nginx:alpine
     container_name: nexus-nginx
-    depends_on: [ api, ai-engine ]
+    depends_on:
+      api: { condition: service_healthy }
     ports:
       - "80:80"
       - "443:443"
@@ -148,7 +161,7 @@ services:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.retention.time=30d'
@@ -159,9 +172,8 @@ services:
     depends_on: [ prometheus ]
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
-      GF_INSTALL_PLUGINS: grafana-worldmap-panel,grafana-clock-panel
     ports:
-      - "3001:3000"
+      - "127.0.0.1:3001:3000"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana-dashboards:/etc/grafana/provisioning/dashboards

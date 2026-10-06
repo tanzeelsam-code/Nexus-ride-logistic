@@ -1,14 +1,14 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm install --only=production
+RUN npm ci --omit=dev
 
 FROM node:20-alpine
 WORKDIR /app
+ENV NODE_ENV=production
 RUN addgroup -S nexus && adduser -S nexus -G nexus
 COPY --from=builder /app/node_modules ./node_modules
-COPY . .
-# Expose the API port
+COPY package.json backend_api.js ./
 EXPOSE 3000
 # Run as non-root user
 USER nexus

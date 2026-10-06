@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  api:
+    name: API end-to-end (Postgres + Redis)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Syntax check
+        run: node --check backend_api.js
+      - name: Start Redis
+        run: |
+          docker run -d --name redis -p 6379:6379 redis:7-alpine redis-server --requirepass redis_secret
+          for i in $(seq 1 20); do docker exec redis redis-cli -a redis_secret ping | grep -q PONG && break; sleep 1; done
+      - name: Start TimescaleDB with the schema loaded
+        run: |
+          docker run -d --name pg -p 5432:5432 \
+            -e POSTGRES_USER=nexus -e POSTGRES_PASSWORD=nexus_secret -e POSTGRES_DB=nexusdb \
+            -v "$PWD/database_schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro" \
+            timescale/timescaledb-ha:pg15-latest
+          for i in $(seq 1 60); do
+            docker logs pg 2>&1 | grep -q "init process complete" && break
+            sleep 2
+          done
+          docker logs pg 2>&1 | grep -q "init process complete"
+          # The init server restarts once after the scripts finish; wait for it to accept connections.
+          for i in $(seq 1 30); do
+            docker exec pg pg_isready -U nexus -d nexusdb && break
+            sleep 2
+          done
+      - name: End-to-end tests
+        env:
+          DB_HOST: localhost
+          DB_PASSWORD: nexus_secret
+          REDIS_HOST: localhost
+          REDIS_PASSWORD: redis_secret
+        run: npm test
+      - name: No-database smoke check
+        run: npm run verify
+
+  ai:
+    name: AI engine
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install (CPU torch)
+        run: pip install -r ai/requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+      - name: Boot and probe
+        run: |
+          python -m py_compile ai_engine.py
+          uvicorn ai_engine:app --port 8001 &
+          for i in $(seq 1 40); do curl -sf localhost:8001/health && break; sleep 2; done
+          curl -sf -X POST localhost:8001/price -H 'content-type: application/json' \
+            -d '{"pickup_lat":40.75,"pickup_lng":-73.98,"dropoff_lat":40.64,"dropoff_lng":-73.78}'
+          curl -sf -X POST localhost:8001/dispatch -H 'content-type: application/json' \
+            -d '{"request_id":"r","customer_id":"c","pickup_lat":40.75,"pickup_lng":-73.98,"pickup_address":"A","dropoff_lat":40.64,"dropoff_lng":-73.78,"dropoff_address":"B","drivers":[{"id":"d1","lat":40.751,"lng":-73.981,"service_types":["taxi"]}]}'
+          curl -sf -X POST localhost:8001/demand/forecast -H 'content-type: application/json' -d '[0,1,2]'

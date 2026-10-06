@@ -1,5 +1,28 @@
 # NEXUS Production Gap Audit and Build Plan
 
+## Status update (2026-10-06)
+
+Re-tested end to end against real PostgreSQL/TimescaleDB, Redis and the AI engine (`npm test`, 100+ checks). Items marked **Fixed** are covered by that suite unless they are infrastructure files (Nginx, compose, Dockerfiles), which were checked by review and `docker compose config` only: Docker Hub was unreachable while testing, so those images were not built.
+
+| Finding | Status |
+|---|---|
+| P0-1 Health check mismatch | **Fixed** – `/health`, `/ready` (real DB/Redis probes), `/metrics`; compose uses `wget`/`curl` that exist in the images |
+| P0-2 Nginx strips `/api` | **Fixed** – paths preserved; WebSocket upgrade headers only on `/socket.io/` |
+| P0-3 Missing Prometheus config | **Fixed** – config present and scraping `/metrics` |
+| P0-4 Mock-driven frontend | **Partly fixed** – KPIs, live trip/delivery/alert panels and driver dots use live data; revenue chart, top drivers, AI panels and `ride.html`/`freight.html` remain sample content |
+| P0-5 Unsafe secrets/defaults | **Fixed** – production fails fast on weak config; no seeded admin (bootstrapped from `ADMIN_EMAIL`/`ADMIN_PASSWORD`) |
+| P0-6 Refresh tokens | **Fixed** – rotation, revocation on logout, refresh tokens rejected as access tokens |
+| P0-7 Stripe webhook | **Fixed** – raw-body route registration bug found and fixed; signature, replay and tamper tests pass |
+| P0-8 Simulated AI drivers | **Fixed** – candidates come from PostGIS; the AI engine no longer invents drivers |
+| P1-1 No tests | **Fixed** – `scripts/e2e.js`, CI workflow |
+| P1-4 No idempotency | **Fixed** – `POST /trips` and `/deliveries` |
+| P1-5 Broad CORS | **Fixed** – explicit origins in production (API and Socket.io) |
+| P1-6 Ops socket room join | **Fixed** – requires an ops/admin token |
+| Not in the original audit, found while testing | Schema aborted Postgres init (compression policy, hypertable keys); `trips.passengers` column missing; driver rating trigger never fired; pricing 500 when the AI engine was down; dispatch assigned fake `drv_*` ids; customers could call driver endpoints; unauthenticated ops/fleet/cold-chain endpoints; refresh token usable as access token; `/ready` reported DB up when down; AI `/dispatch` crashed on real drivers; demand forecast tensor shape bug; `aioredis` import broken on Python 3.11; AI config ignored env vars; Dockerfile.ai pip index broke installs; Postgres data volume path wrong for the HA image; WebView security flags in the Android shell |
+| Still open | Card capture and payouts, trained AI models, rider/driver apps, maps-based routing, notifications, TLS – see README "Known limitations" |
+
+The plan below is the original audit, kept for reference.
+
 ## Snapshot (Current State)
 - Product quality: strong prototype/demo with clear domain coverage for ride + freight.
 - Production readiness: not ready yet due to infrastructure blockers, mock-data frontend, and missing operational controls.
