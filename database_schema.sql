@@ -60,6 +60,7 @@ CREATE TABLE users (
   salt                  TEXT NOT NULL,
   mfa_enabled           BOOLEAN DEFAULT FALSE,
   mfa_secret            TEXT,
+  stripe_customer_id    VARCHAR(64),
   
   -- Address
   default_home_lat      DECIMAL(10,7),
@@ -299,6 +300,7 @@ CREATE TABLE trips (
   -- Service
   service_type          service_type NOT NULL DEFAULT 'taxi',
   vehicle_type_requested vehicle_type,
+  passengers            SMALLINT DEFAULT 1,
   
   -- Route
   pickup_lat            DECIMAL(10,7) NOT NULL,
@@ -376,6 +378,7 @@ CREATE TABLE trips (
   ai_safety_score       DECIMAL(4,3),                          -- Trip safety score
   
   -- Safety
+  pickup_otp            CHAR(4),                               -- rider shows this to the driver to start the trip
   sos_triggered         BOOLEAN DEFAULT FALSE,
   sos_at                TIMESTAMP WITH TIME ZONE,
   route_deviation       BOOLEAN DEFAULT FALSE,
@@ -416,6 +419,7 @@ CREATE INDEX idx_driver_locations_driver_time ON driver_locations(driver_id, tim
 CREATE INDEX idx_driver_locations_geo ON driver_locations USING GIST(location);
 
 -- Automatic compression after 7 days
+ALTER TABLE driver_locations SET (timescaledb.compress, timescaledb.compress_segmentby = 'driver_id');
 SELECT add_compression_policy('driver_locations', INTERVAL '7 days');
 -- Retain for 6 months
 SELECT add_retention_policy('driver_locations', INTERVAL '6 months');
@@ -593,7 +597,7 @@ CREATE INDEX idx_payments_gateway_ref ON payments(gateway_ref);
 -- ============================================================
 
 CREATE TABLE ai_decisions (
-  id              UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id              UUID DEFAULT uuid_generate_v4(),
   decision_type   VARCHAR(50) NOT NULL,                        -- 'dispatch', 'pricing', 'eta', 'routing'
   module          VARCHAR(50) NOT NULL,                        -- AI module name
   
@@ -615,7 +619,8 @@ CREATE TABLE ai_decisions (
   feedback_at     TIMESTAMP WITH TIME ZONE,
   
   processing_ms   SMALLINT,
-  created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  PRIMARY KEY (id, created_at)
 );
 
 SELECT create_hypertable('ai_decisions', 'created_at');
@@ -661,7 +666,7 @@ CREATE TABLE safety_incidents (
 -- ============================================================
 
 CREATE TABLE notifications (
-  id          UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id          UUID DEFAULT uuid_generate_v4(),
   user_id     UUID REFERENCES users(id) NOT NULL,
   channel     notification_channel NOT NULL,
   
@@ -676,7 +681,8 @@ CREATE TABLE notifications (
   failed_at   TIMESTAMP WITH TIME ZONE,
   failure_reason TEXT,
   
-  created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  PRIMARY KEY (id, created_at)
 );
 
 SELECT create_hypertable('notifications', 'created_at');
@@ -781,7 +787,7 @@ CREATE TABLE vehicle_maintenance (
 -- ============================================================
 
 CREATE TABLE audit_logs (
-  id          UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id          UUID DEFAULT uuid_generate_v4(),
   actor_id    UUID REFERENCES users(id),
   actor_role  user_role,
   action      VARCHAR(100) NOT NULL,
@@ -791,7 +797,8 @@ CREATE TABLE audit_logs (
   new_values  JSONB,
   ip_address  INET,
   user_agent  TEXT,
-  created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  PRIMARY KEY (id, created_at)
 );
 
 SELECT create_hypertable('audit_logs', 'created_at');
@@ -850,7 +857,7 @@ CREATE TRIGGER deliveries_updated_at BEFORE UPDATE ON deliveries FOR EACH ROW EX
 CREATE OR REPLACE FUNCTION update_driver_rating()
 RETURNS TRIGGER AS $$
 BEGIN
-  IF NEW.driver_rating IS NOT NULL AND OLD.driver_rating IS NULL THEN
+  IF NEW.customer_rating IS NOT NULL AND OLD.customer_rating IS NULL THEN
     UPDATE drivers SET
       rating_overall = (
         SELECT ROUND(AVG(customer_rating)::NUMERIC, 2)
@@ -871,18 +878,8 @@ AFTER UPDATE OF customer_rating ON trips
 FOR EACH ROW EXECUTE FUNCTION update_driver_rating();
 
 -- ============================================================
--- SEED: Default Admin User
+-- ADMIN BOOTSTRAP
 -- ============================================================
+-- No default admin is seeded. Set ADMIN_EMAIL and ADMIN_PASSWORD and the API
+-- creates (or resets) the admin account at startup.
 
-INSERT INTO users (id, role, email, phone, first_name, last_name, password_hash, salt, is_verified, phone_verified, email_verified)
-VALUES (
-  uuid_generate_v4(),
-  'admin',
-  'admin@nexuslogistics.ai',
-  '+10000000000',
-  'System',
-  'Administrator',
-  'PLACEHOLDER_BCRYPT_HASH',
-  'PLACEHOLDER_SALT',
-  TRUE, TRUE, TRUE
-);

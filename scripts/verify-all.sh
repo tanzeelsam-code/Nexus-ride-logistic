@@ -27,7 +27,8 @@ echo "   ✅ All frontend dashboards and nexus-client.js verified."
 
 # 3. Spin up Backend API on ephemeral port
 echo "3) Starting backend API on port ${TEST_PORT} for integration tests..."
-node backend_api.js > /tmp/nexus-verify.log 2>&1 &
+# DB_PORT/REDIS_PORT point at unused ports so this check always runs in the API's no-database demo mode.
+DB_PORT=1 REDIS_PORT=1 node backend_api.js > /tmp/nexus-verify.log 2>&1 &
 SERVER_PID=$!
 
 cleanup() {
@@ -37,8 +38,11 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Wait for server to boot
-sleep 2
+# Wait for server to boot (up to 15s)
+for _ in $(seq 1 30); do
+  curl -sf "http://localhost:${TEST_PORT}/health" >/dev/null 2>&1 && break
+  sleep 0.5
+done
 
 # 4. Run Endpoint Checks
 echo "4) Running API integration tests against http://localhost:${TEST_PORT}..."
@@ -79,11 +83,20 @@ else
 fi
 
 echo "   -> Diurnal Fleet Rebalance..."
-REB_RES=$(curl -s "http://localhost:${TEST_PORT}/api/v1/fleet/rebalance")
+REB_RES=$(curl -s -X POST -H "Content-Type: application/json" -d '{}' "http://localhost:${TEST_PORT}/api/v1/fleet/rebalance")
 if echo "${REB_RES}" | grep -q "drivers_rebalanced"; then
   echo "      ✅ Diurnal fleet rebalance algorithm passed."
 else
   echo "      ❌ Diurnal fleet rebalance failed: ${REB_RES}"
+  exit 1
+fi
+
+echo "   -> Auth is enforced on protected routes..."
+AUTH_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${TEST_PORT}/api/v1/trips")
+if [ "${AUTH_CODE}" = "401" ]; then
+  echo "      ✅ /trips rejects anonymous requests (401)."
+else
+  echo "      ❌ Expected 401 from /trips, got ${AUTH_CODE}."
   exit 1
 fi
 
@@ -94,6 +107,6 @@ echo "      ✅ Prometheus metrics output verified."
 
 echo
 echo "========================================================"
-echo "   🎉 ALL 5 SYSTEM CHECKS PASSED SUCCESSFULLY!"
-echo "   NEXUS Logistics is ready for operation and deployment."
+echo "   🎉 ALL SYSTEM CHECKS PASSED (no-database mode)."
+echo "   Full ride + freight flows need Postgres and Redis: run 'npm test'."
 echo "========================================================"

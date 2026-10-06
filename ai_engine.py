@@ -11,6 +11,7 @@ Requirements:
 
 import asyncio
 import json
+import os
 import math
 import time
 import uuid
@@ -27,7 +28,7 @@ import torch.nn.functional as F
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-import aioredis
+from redis import asyncio as aioredis
 import httpx
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(name)s] %(levelname)s: %(message)s')
@@ -38,12 +39,11 @@ logger = logging.getLogger("NEXUS-CORE")
 # ============================================================
 
 class Config:
-    REDIS_URL = "redis://localhost:6379"
-    KAFKA_BROKERS = ["localhost:9092"]
-    POSTGRES_URL = "postgresql://nexus:nexus@localhost/nexusdb"
-    MAPS_API_KEY = "YOUR_MAPBOX_KEY"
-    WEATHER_API_KEY = "YOUR_WEATHER_KEY"
-    ANTHROPIC_API_KEY = "YOUR_ANTHROPIC_KEY"
+    REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+    KAFKA_BROKERS = os.getenv("KAFKA_BROKERS", "localhost:9092").split(",")
+    MAPS_API_KEY = os.getenv("MAPBOX_API_KEY", "")
+    WEATHER_API_KEY = os.getenv("WEATHER_API_KEY", "")
+    ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
     
     # Model paths
     DISPATCH_MODEL_PATH = "models/dispatch_brain_v3.pt"
@@ -328,7 +328,10 @@ class DemandOracleNet(nn.Module):
         z_emb = self.zone_embedding(zone_ids)
         t_emb = self.time_embedding(time_feats)
         f_emb = self.feature_proj(historical_feats)
-        
+
+        # Time features are per-request; broadcast them across the zone sequence.
+        t_emb = t_emb.unsqueeze(1).expand(-1, z_emb.size(1), -1)
+
         x = torch.cat([z_emb, t_emb, f_emb], dim=-1)
         x = self.input_proj(x)
         x = self.transformer(x)
@@ -362,9 +365,16 @@ class NexusCore:
     
     async def initialize(self):
         """Connect to infrastructure services"""
-        self.redis = await aioredis.from_url(Config.REDIS_URL, decode_responses=True)
+        try:
+            client = aioredis.from_url(Config.REDIS_URL, decode_responses=True)
+            await client.ping()
+            self.redis = client
+            logger.info("NEXUS CORE connected to Redis")
+        except Exception as exc:
+            # Surge/fraud/safety caches are optional; run without them rather than crash.
+            self.redis = None
+            logger.warning("Redis unavailable (%s); running without cache", exc)
         self._initialized = True
-        logger.info("NEXUS CORE connected to Redis")
     
     # ----------------------------------------------------------
     # MODULE 1: DISPATCH BRAIN
@@ -989,6 +999,8 @@ Issue Type: {context.get('issue_type', 'general')}
 """
         
         try:
+            if not Config.ANTHROPIC_API_KEY:
+                raise RuntimeError("ANTHROPIC_API_KEY is not configured")
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     "https://api.anthropic.com/v1/messages",
@@ -998,7 +1010,7 @@ Issue Type: {context.get('issue_type', 'general')}
                         "content-type": "application/json"
                     },
                     json={
-                        "model": "claude-sonnet-4-20250514",
+                        "model": os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5-5"),
                         "max_tokens": 500,
                         "system": system_prompt,
                         "messages": [
@@ -1007,6 +1019,7 @@ Issue Type: {context.get('issue_type', 'general')}
                     },
                     timeout=30.0
                 )
+                response.raise_for_status()
                 data = response.json()
                 return data['content'][0]['text']
         except Exception as e:
@@ -1197,7 +1210,7 @@ async def dispatch_driver(req: DispatchRequest, background_tasks: BackgroundTask
         requires_refrigeration=req.requires_refrigeration
     )
     
-    # Use real candidate drivers if provided by API/PostGIS, otherwise generate nearby candidates
+    # Candidate drivers come from the API (PostGIS proximity search)
     if req.drivers and len(req.drivers) > 0:
         candidate_drivers = [
             Driver(
@@ -1209,17 +1222,14 @@ async def dispatch_driver(req: DispatchRequest, background_tasks: BackgroundTask
                 completion_rate=float(d.get("completion_rate", 98.0)),
                 vehicle_type=str(d.get("vehicle_type", "sedan")),
                 service_types=list(d.get("service_types", ["taxi", "freight"])),
-                trips_today=int(d.get("trips_today", 5))
+                total_trips=int(d.get("total_trips", d.get("trips_today", 5)))
             )
             for i, d in enumerate(req.drivers)
         ]
     else:
-        candidate_drivers = [
-            Driver(f"drv_{i}", req.pickup_lat + (i * 0.005), req.pickup_lng + (i * 0.003),
-                   4.5 - (i * 0.1), 92.0 - i, 97.0, "sedan", ["taxi", "airport", "freight"], 500 + i * 100)
-            for i in range(8)
-        ]
-    
+        # Never fabricate drivers: the caller must supply real candidates.
+        raise HTTPException(status_code=503, detail="No available drivers in your area")
+
     decision = await nexus_core.dispatch(request, candidate_drivers)
     
     if not decision:
@@ -1419,4 +1429,4 @@ async def check_cold_chain(req: ColdChainCheckRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("ai_engine:app", host="0.0.0.0", port=8001, reload=True, workers=4)
+    uvicorn.run("ai_engine:app", host="0.0.0.0", port=8001, workers=2)
