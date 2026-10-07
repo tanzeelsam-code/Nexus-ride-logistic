@@ -630,6 +630,11 @@
         showMessage('Tracking link not found', 'Check the link you were sent, or contact the sender.');
         return;
       }
+      if (res.status === 503) {
+        clearInterval(pollTimer);
+        showMessage('Tracking unavailable', 'The tracking service is not connected right now. Please try again later.');
+        return;
+      }
       if (!res.ok) return;
       const data = await res.json();
       currentDelivery = data.delivery;

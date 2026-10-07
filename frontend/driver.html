@@ -653,7 +653,13 @@
       if (store.get(TOKEN_KEY)) return startApp();
       try {
         // Without a database there are no driver accounts, so skip the sign-in form.
-        const ready = await fetch('/ready').then((r) => r.json());
+        // A static host (no API) answers /ready with a non-JSON 404.
+        const res = await fetch('/ready');
+        const ready = await res.json().catch(() => null);
+        if (!ready) {
+          $('offline-text').textContent = 'This preview has no backend server, so there are no driver accounts or jobs.';
+          return showView('offline');
+        }
         if (ready.checks && ready.checks.database !== 'up') return showView('offline');
       } catch { /* fall through to login */ }
       showView('login');
