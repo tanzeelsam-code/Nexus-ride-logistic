@@ -20,6 +20,8 @@ const Stripe = require('stripe');
 const axios = require('axios');
 const pino = require('pino');
 const crypto = require('crypto');
+const path = require('path');
+const fs = require('fs');
 
 // ============================================================
 // CONFIGURATION
@@ -75,9 +77,11 @@ const config = {
     database: getEnv('DB_NAME', 'nexusdb'),
     user: getEnv('DB_USER', 'nexus'),
     password: getEnv('DB_PASSWORD', isProduction ? '' : 'nexus_secret'),
+    // Hosted Postgres (e.g. Supabase) requires TLS; local Docker does not.
+    ssl: getEnv('DB_SSL', 'false') === 'true' ? { rejectUnauthorized: false } : false,
     max: 20,                          // Connection pool size
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
+    connectionTimeoutMillis: Number(getEnv('DB_CONNECT_TIMEOUT_MS', 2000)),
   },
   
   redis: {
@@ -305,6 +309,9 @@ async function ensureOperationalTables() {
   `);
 
   await query('CREATE INDEX IF NOT EXISTS idx_stripe_webhooks_received_at ON stripe_webhook_events(received_at DESC)');
+
+  // Proof of delivery: who signed for it. Added after the initial schema.
+  await query('ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS dropoff_recipient_name VARCHAR(100)');
 }
 
 // ============================================================
@@ -463,6 +470,8 @@ app.register(require('@fastify/rate-limit'), {
   max: 100,
   timeWindow: '1 minute',
   redis,
+  // If Redis is unreachable, serve the request rather than failing it with a 500.
+  skipOnError: true,
   keyGenerator: (req) => req.ip
 });
 
@@ -472,6 +481,12 @@ app.register(require('fastify-raw-body'), {
   global: false,
   encoding: false,
   runFirst: true,
+});
+
+app.register(require('@fastify/static'), {
+  root: path.join(__dirname, 'frontend'),
+  prefix: '/',
+  decorateReply: false
 });
 
 async function persistRefreshTokenSession({ jti, userId, role }) {
@@ -948,6 +963,13 @@ const schemas = {
     insurance_requested: z.boolean().default(false),
   }),
 
+  // Signature arrives as a PNG data URL from the driver app's signature pad (~200 KB cap).
+  proofOfDelivery: z.object({
+    otp: z.union([z.string(), z.number()]).optional(),
+    recipient_name: z.string().trim().min(1).max(100).optional(),
+    pod_signature: z.string().max(200_000).regex(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/, 'Signature must be a PNG data URL').optional(),
+    pod_photo_url: z.string().url().max(2000).optional(),
+  }).passthrough(),
   coldChainTelemetry: z.object({
     delivery_id: z.string().regex(/^[A-Za-z0-9_-]{1,60}$/, 'delivery_id may contain letters, digits, - and _ only'),
     temperature_c: z.number().min(-100).max(100),
@@ -1856,11 +1878,25 @@ async function driverDeliveryAction(driver, deliveryId, action, body = {}) {
     const fare = Number(d.total_fare);
     const platformFee = Number((fare * PLATFORM_FEE_RATE).toFixed(2));
     const driverEarnings = Number((fare - platformFee).toFixed(2));
+
+    const pod = schemas.proofOfDelivery.safeParse(body);
+    if (!pod.success) return { code: 400, body: { error: 'Invalid proof of delivery', details: pod.error.issues.map(i => i.message) } };
+    const podSignature = pod.data.pod_signature || null;
+    const podPhotoUrl = pod.data.pod_photo_url || null;
+    const podRecipientName = pod.data.recipient_name || d.dropoff_contact_name || 'Recipient';
+
     const ok = await transaction(async (client) => {
       const { rowCount } = await client.query(`
-        UPDATE deliveries SET status = 'delivered', delivered_at = NOW(), platform_fee = $1, driver_earnings = $2
+        UPDATE deliveries SET
+          status = 'delivered',
+          delivered_at = NOW(),
+          platform_fee = $1,
+          driver_earnings = $2,
+          dropoff_signature_url = COALESCE($4, dropoff_signature_url),
+          dropoff_photo_url = COALESCE($5, dropoff_photo_url),
+          dropoff_recipient_name = $6
         WHERE id = $3 AND status IN ('in_transit','out_for_delivery')
-      `, [platformFee, driverEarnings, d.id]);
+      `, [platformFee, driverEarnings, d.id, podSignature, podPhotoUrl, podRecipientName]);
       if (rowCount !== 1) return false;
       await client.query(`
         UPDATE drivers SET total_trips = total_trips + 1, completed_trips = completed_trips + 1,
@@ -1870,8 +1906,26 @@ async function driverDeliveryAction(driver, deliveryId, action, body = {}) {
       return true;
     });
     if (!ok) return bad();
-    io.to(`user:${d.customer_id}`).emit('delivery:delivered', { delivery_id: d.id });
-    return { code: 200, body: { message: 'Delivery completed', status: 'delivered', driver_earnings: driverEarnings } };
+    io.to(`user:${d.customer_id}`).emit('delivery:delivered', {
+      delivery_id: d.id,
+      recipient_name: podRecipientName,
+      has_signature: !!podSignature,
+      has_photo: !!podPhotoUrl
+    });
+    return {
+      code: 200,
+      body: {
+        message: 'Delivery completed with Proof-of-Delivery',
+        status: 'delivered',
+        driver_earnings: driverEarnings,
+        pod: {
+          recipient_name: podRecipientName,
+          signature_captured: !!podSignature,
+          photo_captured: !!podPhotoUrl,
+          completed_at: new Date().toISOString()
+        }
+      }
+    };
   }
 
   return { code: 400, body: { error: 'Unknown action' } };
@@ -1992,30 +2046,98 @@ app.post('/api/v1/deliveries/:id/cancel', { preHandler: [authenticate, requireDa
   return reply.send({ message: 'Delivery cancelled' });
 });
 
-// Track delivery (public endpoint)
+// Track delivery or trip (public endpoint)
+// Public tracking. With a database, only the unguessable tracking slug works: delivery
+// numbers are sequential and ids are internal. Without one, the demo shipments are
+// reachable by their demo id so the page can be previewed.
+const TRACK_SLUG_RE = /^[a-f0-9]{24}$/;
+
+function demoTrackingRecord(id) {
+  const mem = inMemoryStore.deliveries.find(d => d.id === id);
+  if (!mem) return null;
+  const cc = inMemoryStore.coldChainShipments.find(s => s.id === id);
+  return {
+    delivery_number: mem.id,
+    status: mem.status,
+    cargo_description: cc?.cargo || (mem.type === 'cold_chain' ? 'Temperature-sensitive cargo' : 'Commercial goods'),
+    pickup_address: mem.from,
+    dropoff_address: mem.to,
+    pickup_lat: 40.7895, pickup_lng: -74.0565,
+    dropoff_lat: 40.7397, dropoff_lng: -73.9754,
+    current_lat: 40.7580, current_lng: -73.9855,
+    current_temp_celsius: cc?.current_temp_c ?? mem.current_temp_c ?? null,
+    temp_min_celsius: cc?.min_temp_c ?? null,
+    temp_max_celsius: cc?.max_temp_c ?? null,
+    temp_alerts_count: cc && cc.status !== 'NORMAL' ? 1 : 0,
+    requires_refrigeration: mem.type === 'cold_chain',
+    estimated_delivery_at: new Date(Date.now() + 28 * 60000).toISOString(),
+    delivered_at: null,
+    driver_first_name: mem.driver ? mem.driver.split(' ')[0] : null,
+    make: null, model: mem.vehicle || null, plate_number: cc?.plate || null,
+    progress_pct: mem.progress_pct ?? null,
+    sensor_battery_pct: cc ? parseInt(cc.battery, 10) : null,
+    is_demo: true,
+  };
+}
+
+async function findTrackedDelivery(slug) {
+  if (dbConnected) {
+    if (!TRACK_SLUG_RE.test(slug)) return null;
+    const { rows: [d] } = await query(`
+      SELECT
+        d.delivery_number, d.status, d.cargo_description,
+        d.pickup_address, d.dropoff_address,
+        d.pickup_lat, d.pickup_lng, d.dropoff_lat, d.dropoff_lng,
+        d.current_lat, d.current_lng, d.current_temp_celsius,
+        d.temp_min_celsius, d.temp_max_celsius, d.temp_alerts_count, d.requires_refrigeration,
+        d.estimated_delivery_at, d.picked_up_at, d.delivered_at, d.created_at,
+        (d.dropoff_signature_url IS NOT NULL) AS signature_captured,
+        u.first_name as driver_first_name,
+        v.make, v.model, v.plate_number
+      FROM deliveries d
+      LEFT JOIN drivers dr ON d.driver_id = dr.id
+      LEFT JOIN users u ON dr.user_id = u.id
+      LEFT JOIN LATERAL (
+        SELECT make, model, plate_number FROM vehicles WHERE driver_id = dr.id AND is_active ORDER BY created_at LIMIT 1
+      ) v ON TRUE
+      WHERE d.tracking_url = $1
+    `, [`https://track.nexuslogistics.ai/${slug}`]);
+    return d ? { ...d, is_demo: false } : null;
+  }
+  return demoTrackingRecord(slug);
+}
+
+// Temperature status from what telemetry actually records: the latest reading and how
+// many readings fell outside the range. There is no reading history, so no time-based
+// excursion budget or mean kinetic temperature is claimed.
+function temperatureSummary(d) {
+  if (!d.requires_refrigeration) return null;
+  const min = d.temp_min_celsius != null ? Number(d.temp_min_celsius) : null;
+  const max = d.temp_max_celsius != null ? Number(d.temp_max_celsius) : null;
+  const current = d.current_temp_celsius != null ? Number(d.current_temp_celsius) : null;
+  const excursions = Number(d.temp_alerts_count || 0);
+  const inRange = current == null || min == null || max == null ? null : current >= min && current <= max;
+  return {
+    current_c: current,
+    min_c: min,
+    max_c: max,
+    in_range: inRange,
+    excursion_readings: excursions,
+    status: current == null ? 'NO_DATA' : inRange === false ? 'OUT_OF_RANGE' : excursions > 0 ? 'RECOVERED' : 'IN_RANGE',
+  };
+}
+
 app.get('/api/v1/track/:slug', async (req, reply) => {
-  const trackingUrl = `https://track.nexuslogistics.ai/${req.params.slug}`;
-
-  const { rows: [delivery] } = await query(`
-    SELECT
-      d.delivery_number, d.status, d.cargo_description,
-      d.pickup_address, d.dropoff_address,
-      d.current_lat, d.current_lng, d.current_temp_celsius,
-      d.estimated_delivery_at, d.delivered_at,
-      u.first_name as driver_first_name,
-      v.make, v.model, v.plate_number
-    FROM deliveries d
-    LEFT JOIN drivers dr ON d.driver_id = dr.id
-    LEFT JOIN users u ON dr.user_id = u.id
-    LEFT JOIN LATERAL (
-      SELECT make, model, plate_number FROM vehicles WHERE driver_id = dr.id AND is_active ORDER BY created_at LIMIT 1
-    ) v ON TRUE
-    WHERE d.tracking_url = $1
-  `, [trackingUrl]);
-
+  const delivery = await findTrackedDelivery(req.params.slug);
   if (!delivery) return reply.code(404).send({ error: 'Tracking not found' });
+  return reply.send({ delivery: { ...delivery, temperature: temperatureSummary(delivery) } });
+});
 
-  return reply.send({ delivery });
+// Shareable tracking link: /track/<slug> serves the tracking page, which reads the slug from the path.
+const trackPagePath = path.join(__dirname, 'frontend', 'track.html');
+app.get('/track/:slug', async (req, reply) => {
+  const html = await fs.promises.readFile(trackPagePath);
+  return reply.type('text/html; charset=utf-8').send(html);
 });
 
 // ------------------------------------------------------------
@@ -2258,6 +2380,33 @@ app.get('/api/v1/cold-chain/shipments', { preHandler: opsGuard }, async (req, re
     total_monitored: shipments.length,
     active_excursions: shipments.filter(s => s.status !== 'NORMAL').length,
     timestamp: new Date().toISOString()
+  });
+});
+
+// Cold-chain compliance & stability audit report (public / verified)
+// Temperature summary for a tracked shipment. Public, so it is keyed by the tracking slug
+// like /track. It reports recorded readings only; it is not a regulatory release certificate.
+app.get('/api/v1/track/:slug/temperature-report', async (req, reply) => {
+  const delivery = await findTrackedDelivery(req.params.slug);
+  if (!delivery) return reply.code(404).send({ error: 'Tracking not found' });
+  const temperature = temperatureSummary(delivery);
+  if (!temperature) return reply.code(404).send({ error: 'This shipment is not temperature-controlled' });
+
+  const verdict = temperature.status === 'NO_DATA' ? 'NO_DATA'
+    : temperature.status === 'OUT_OF_RANGE' ? 'OUT_OF_RANGE_NOW'
+    : temperature.excursion_readings > 0 ? 'REVIEW_EXCURSIONS'
+    : 'ALL_READINGS_IN_RANGE';
+
+  return reply.send({
+    report_id: `TR-${delivery.delivery_number}`,
+    delivery_number: delivery.delivery_number,
+    cargo_description: delivery.cargo_description,
+    status: delivery.status,
+    temperature,
+    verdict,
+    delivered_at: delivery.delivered_at || null,
+    generated_at: new Date().toISOString(),
+    is_demo: delivery.is_demo,
   });
 });
 

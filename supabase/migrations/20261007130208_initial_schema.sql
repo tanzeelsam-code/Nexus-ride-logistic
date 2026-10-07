@@ -1,14 +1,18 @@
+-- Supabase-compatible version of database_schema.sql (generated; TimescaleDB removed, RLS enabled).
 -- ============================================================
 -- NEXUS LOGISTICS — COMPLETE DATABASE SCHEMA
--- PostgreSQL 15 + TimescaleDB Extension
+-- Supabase Postgres 17 (PostGIS)
 -- ============================================================
 
+-- Resolve extension types and functions without creating application objects outside public.
+SET search_path = public, extensions;
+
 -- Enable extensions
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "postgis";          -- Geospatial
-CREATE EXTENSION IF NOT EXISTS "timescaledb";      -- Time-series
-CREATE EXTENSION IF NOT EXISTS "pg_trgm";          -- Fuzzy search
-CREATE EXTENSION IF NOT EXISTS "btree_gist";
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp"  WITH SCHEMA extensions;
+CREATE EXTENSION IF NOT EXISTS "postgis"    WITH SCHEMA extensions;  -- Geospatial
+CREATE EXTENSION IF NOT EXISTS "pg_trgm"    WITH SCHEMA extensions;  -- Fuzzy search
+CREATE EXTENSION IF NOT EXISTS "btree_gist" WITH SCHEMA extensions;
+-- timescaledb is not available on Supabase (Postgres 17); hypertables below are plain tables.
 
 -- ============================================================
 -- ENUMS
@@ -100,7 +104,6 @@ CREATE INDEX idx_users_phone ON users(phone);
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_role ON users(role);
 CREATE INDEX idx_users_referral ON users(referral_code);
-CREATE INDEX idx_users_referred_by ON users(referred_by);
 
 -- ============================================================
 -- DRIVERS TABLE (extends users)
@@ -397,12 +400,9 @@ CREATE INDEX idx_trips_driver ON trips(driver_id);
 CREATE INDEX idx_trips_status ON trips(status);
 CREATE INDEX idx_trips_requested ON trips(requested_at DESC);
 CREATE INDEX idx_trips_number ON trips(trip_number);
-CREATE INDEX idx_trips_vehicle ON trips(vehicle_id);
-CREATE INDEX idx_trips_zone ON trips(zone_id);
-CREATE INDEX idx_trips_surge_zone ON trips(surge_zone_id);
 
 -- ============================================================
--- DRIVER LOCATION HISTORY (TimescaleDB Hypertable)
+-- DRIVER LOCATION HISTORY (plain table; previously a Timescale hypertable)
 -- ============================================================
 
 CREATE TABLE driver_locations (
@@ -418,15 +418,9 @@ CREATE TABLE driver_locations (
   battery_pct SMALLINT
 );
 
-SELECT create_hypertable('driver_locations', 'time');
 CREATE INDEX idx_driver_locations_driver_time ON driver_locations(driver_id, time DESC);
 CREATE INDEX idx_driver_locations_geo ON driver_locations USING GIST(location);
 
--- Automatic compression after 7 days
-ALTER TABLE driver_locations SET (timescaledb.compress, timescaledb.compress_segmentby = 'driver_id');
-SELECT add_compression_policy('driver_locations', INTERVAL '7 days');
--- Retain for 6 months
-SELECT add_retention_policy('driver_locations', INTERVAL '6 months');
 
 -- ============================================================
 -- DELIVERIES (FREIGHT)
@@ -490,7 +484,6 @@ CREATE TABLE deliveries (
   dropoff_otp             CHAR(6),
   dropoff_signature_url   TEXT,
   dropoff_photo_url       TEXT,
-  dropoff_recipient_name  VARCHAR(100),                        -- Who signed for it (proof of delivery)
   delivered_at            TIMESTAMP WITH TIME ZONE,
   
   -- Tracking
@@ -545,8 +538,6 @@ CREATE INDEX idx_deliveries_customer ON deliveries(customer_id);
 CREATE INDEX idx_deliveries_driver ON deliveries(driver_id);
 CREATE INDEX idx_deliveries_status ON deliveries(status);
 CREATE INDEX idx_deliveries_tracking ON deliveries(tracking_url);
-CREATE INDEX idx_deliveries_vehicle ON deliveries(vehicle_id);
-CREATE INDEX idx_deliveries_zone ON deliveries(zone_id);
 
 -- ============================================================
 -- PAYMENTS
@@ -630,7 +621,6 @@ CREATE TABLE ai_decisions (
   PRIMARY KEY (id, created_at)
 );
 
-SELECT create_hypertable('ai_decisions', 'created_at');
 CREATE INDEX idx_ai_decisions_type ON ai_decisions(decision_type, created_at DESC);
 
 -- ============================================================
@@ -668,12 +658,6 @@ CREATE TABLE safety_incidents (
   created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_safety_incidents_trip ON safety_incidents(trip_id);
-CREATE INDEX idx_safety_incidents_delivery ON safety_incidents(delivery_id);
-CREATE INDEX idx_safety_incidents_driver ON safety_incidents(driver_id);
-CREATE INDEX idx_safety_incidents_customer ON safety_incidents(customer_id);
-CREATE INDEX idx_safety_incidents_resolved_by ON safety_incidents(resolved_by);
-
 -- ============================================================
 -- NOTIFICATIONS
 -- ============================================================
@@ -698,7 +682,6 @@ CREATE TABLE notifications (
   PRIMARY KEY (id, created_at)
 );
 
-SELECT create_hypertable('notifications', 'created_at');
 CREATE INDEX idx_notifications_user ON notifications(user_id, created_at DESC);
 
 -- ============================================================
@@ -765,8 +748,6 @@ CREATE TABLE driver_documents (
   CONSTRAINT unique_driver_doc_type UNIQUE(driver_id, type)
 );
 
-CREATE INDEX idx_driver_documents_verified_by ON driver_documents(verified_by);
-
 -- ============================================================
 -- FLEET MAINTENANCE
 -- ============================================================
@@ -797,8 +778,6 @@ CREATE TABLE vehicle_maintenance (
   created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_vehicle_maintenance_vehicle ON vehicle_maintenance(vehicle_id);
-
 -- ============================================================
 -- AUDIT LOG
 -- ============================================================
@@ -818,8 +797,6 @@ CREATE TABLE audit_logs (
   PRIMARY KEY (id, created_at)
 );
 
-SELECT create_hypertable('audit_logs', 'created_at');
-CREATE INDEX idx_audit_logs_actor ON audit_logs(actor_id);
 
 -- ============================================================
 -- VIEWS
@@ -843,7 +820,7 @@ CREATE UNIQUE INDEX ON active_drivers_view(id);
 CREATE INDEX ON active_drivers_view USING GIST(current_location);
 
 -- Trip analytics summary
-CREATE VIEW trip_summary_today AS
+CREATE VIEW trip_summary_today WITH (security_invoker = true) AS
 SELECT
   COUNT(*) FILTER (WHERE status = 'completed') as completed,
   COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
@@ -861,9 +838,12 @@ WHERE DATE(created_at) = CURRENT_DATE;
 
 -- Auto-update updated_at
 CREATE OR REPLACE FUNCTION update_updated_at()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
 BEGIN NEW.updated_at = NOW(); RETURN NEW; END;
-$$ LANGUAGE plpgsql;
+$$;
 
 CREATE TRIGGER users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER drivers_updated_at BEFORE UPDATE ON drivers FOR EACH ROW EXECUTE FUNCTION update_updated_at();
@@ -873,23 +853,26 @@ CREATE TRIGGER deliveries_updated_at BEFORE UPDATE ON deliveries FOR EACH ROW EX
 
 -- Update driver rating after trip rating
 CREATE OR REPLACE FUNCTION update_driver_rating()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
 BEGIN
   IF NEW.customer_rating IS NOT NULL AND OLD.customer_rating IS NULL THEN
-    UPDATE drivers SET
+    UPDATE public.drivers SET
       rating_overall = (
         SELECT ROUND(AVG(customer_rating)::NUMERIC, 2)
-        FROM trips WHERE driver_id = NEW.driver_id AND customer_rating IS NOT NULL
+        FROM public.trips WHERE driver_id = NEW.driver_id AND customer_rating IS NOT NULL
       ),
       rating_count = (
-        SELECT COUNT(*) FROM trips WHERE driver_id = NEW.driver_id AND customer_rating IS NOT NULL
+        SELECT COUNT(*) FROM public.trips WHERE driver_id = NEW.driver_id AND customer_rating IS NOT NULL
       ),
       updated_at = NOW()
     WHERE id = NEW.driver_id;
   END IF;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 CREATE TRIGGER trip_rating_update
 AFTER UPDATE OF customer_rating ON trips
@@ -901,3 +884,40 @@ FOR EACH ROW EXECUTE FUNCTION update_driver_rating();
 -- No default admin is seeded. Set ADMIN_EMAIL and ADMIN_PASSWORD and the API
 -- creates (or resets) the admin account at startup.
 
+
+-- ============================================================
+-- SUPABASE: operational table normally created by the API at startup
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS stripe_webhook_events (
+  id BIGSERIAL PRIMARY KEY,
+  event_id TEXT NOT NULL UNIQUE,
+  event_type TEXT NOT NULL,
+  payload JSONB NOT NULL,
+  signature TEXT,
+  delivery_attempt INTEGER NOT NULL DEFAULT 1,
+  received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  processed_at TIMESTAMPTZ,
+  processing_error TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_stripe_webhooks_received_at ON stripe_webhook_events(received_at DESC);
+
+-- ============================================================
+-- SUPABASE: lock down the public schema
+-- ============================================================
+-- The Nexus API talks to Postgres directly as the `postgres` role (which bypasses RLS)
+-- and does its own JWT auth. Nothing should be reachable through Supabase's Data API
+-- with the anon/authenticated keys, so: RLS on everywhere, no policies, no grants.
+
+DO $$
+DECLARE t record;
+BEGIN
+  FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' LOOP
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t.tablename);
+  END LOOP;
+END $$;
+
+REVOKE ALL ON ALL TABLES    IN SCHEMA public FROM anon, authenticated;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
+REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM anon, authenticated, PUBLIC;
+REVOKE ALL ON active_drivers_view FROM anon, authenticated;
