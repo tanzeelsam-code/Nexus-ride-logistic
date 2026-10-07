@@ -17,7 +17,7 @@ echo "   ✅ Code syntax validation passed."
 
 # 2. Frontend Assets Check
 echo "2) Checking frontend assets..."
-for f in frontend/index.html frontend/ride.html frontend/freight.html frontend/nexus-client.js; do
+for f in frontend/index.html frontend/ride.html frontend/freight.html frontend/track.html frontend/driver.html frontend/nexus-client.js; do
   if [ ! -f "$f" ]; then
     echo "   ❌ Missing frontend asset: $f"
     exit 1
@@ -99,6 +99,23 @@ else
   echo "      ❌ Expected 401 from /trips, got ${AUTH_CODE}."
   exit 1
 fi
+
+echo "   -> Public tracking (demo shipments)..."
+expect_code() {
+  local code
+  code=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${TEST_PORT}$1")
+  if [ "${code}" != "$2" ]; then
+    echo "      ❌ Expected $2 from $1, got ${code}."
+    exit 1
+  fi
+}
+expect_code /api/v1/track/DEL-44200 200
+expect_code /api/v1/track/DEL-00000 404
+expect_code /api/v1/track/DEL-44200/temperature-report 200
+expect_code /api/v1/track/DEL-44201/temperature-report 404
+expect_code /track/DEL-44200 200
+expect_code /driver.html 200
+echo "      ✅ Tracking API, temperature report, share link and driver page verified."
 
 echo "   -> Prometheus Metrics..."
 METRICS_RES=$(curl -s "http://localhost:${TEST_PORT}/api/v1/metrics" | head -n 5)

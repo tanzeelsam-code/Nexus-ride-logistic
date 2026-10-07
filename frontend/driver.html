@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>NEXUS Driver Co-Pilot & e-POD Terminal</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(16, 23, 38, 0.95);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --primary: #00e5ff;
+      --accent: #6366f1;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px;
+    }
+
+    .mobile-frame {
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding-bottom: 40px;
+    }
+
+    /* Driver Status Header */
+    .driver-header {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+    }
+
+    .driver-profile {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .driver-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--accent), var(--primary));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      border: 2px solid rgba(255,255,255,0.2);
+    }
+
+    .status-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 30px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: var(--success);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    /* Earnings Summary */
+    .earnings-card {
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.9));
+      border: 1px solid rgba(0, 229, 255, 0.2);
+      border-radius: 20px;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .earnings-card::after {
+      content: '';
+      position: absolute;
+      top: -30px;
+      right: -30px;
+      width: 100px;
+      height: 100px;
+      background: radial-gradient(circle, rgba(0,229,255,0.15), transparent 70%);
+      pointer-events: none;
+    }
+
+    .earnings-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .earnings-val {
+      font-size: 36px;
+      font-weight: 800;
+      color: var(--text);
+      margin: 6px 0;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .earnings-stats {
+      display: flex;
+      gap: 20px;
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .stat-badge {
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    /* Active Job Card */
+    .job-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .job-badge-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .job-type-pill {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: rgba(99, 102, 241, 0.2);
+      color: #a5b4fc;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .payout-pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--success);
+    }
+
+    .address-flow {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+      padding-left: 14px;
+      border-left: 2px dashed rgba(255,255,255,0.1);
+      margin-left: 6px;
+    }
+
+    .addr-point {
+      font-size: 13px;
+    }
+    .addr-point span {
+      display: block;
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Action Buttons */
+    .btn-action {
+      width: 100%;
+      padding: 16px;
+      border-radius: 14px;
+      background: var(--primary);
+      border: none;
+      color: #000;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 20px rgba(0, 229, 255, 0.3);
+      transition: all 0.2s;
+    }
+
+    .btn-action:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 25px rgba(0, 229, 255, 0.4);
+    }
+
+    /* Digital Proof of Delivery Modal / Drawer */
+    #pod-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(8px);
+      z-index: 10000;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .pod-dialog {
+      width: 100%;
+      max-width: 440px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .pod-title {
+      font-size: 16px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .input-group label {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    .input-group input {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 12px;
+      color: #fff;
+      font-size: 14px;
+      font-family: inherit;
+    }
+
+    /* Canvas Signature Pad */
+    .sig-canvas-wrap {
+      border: 1px solid var(--card-border);
+      background: #0f172a;
+      border-radius: 12px;
+      position: relative;
+    }
+    canvas {
+      width: 100%;
+      height: 140px;
+      border-radius: 12px;
+      touch-action: none;
+    }
+    .clear-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(255,255,255,0.1);
+      border: none;
+      color: var(--text-muted);
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 10px;
+      cursor: pointer;
+    }
+  
+    .notice { font-size: 13px; color: var(--text-muted); text-align: center; padding: 24px 12px; }
+    .notice strong { color: var(--text); display: block; font-size: 15px; margin-bottom: 6px; }
+    .error-text { color: var(--danger); font-size: 12px; min-height: 16px; margin-top: 6px; }
+    .btn-row { display: flex; gap: 10px; }
+    .btn-secondary { background: rgba(255,255,255,0.1) !important; color: #fff !important; box-shadow: none !important; }
+    .link-btn { background: none; border: none; color: var(--text-muted); font-size: 11px; cursor: pointer; text-decoration: underline; }
+    .jobs { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; }
+  </style>
+</head>
+<body>
+
+  <div class="mobile-frame">
+    <!-- Sign in -->
+    <div class="job-card" id="login-view" style="display:none;">
+      <h3 style="font-size:16px;font-weight:700;">Driver sign in</h3>
+      <form id="login-form" onsubmit="login(event)">
+        <div class="input-group">
+          <label for="login-email">Email</label>
+          <input type="email" id="login-email" autocomplete="username" required>
+        </div>
+        <div class="input-group">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" autocomplete="current-password" required>
+        </div>
+        <button class="btn-action" type="submit">Sign in</button>
+        <div class="error-text" id="login-error"></div>
+      </form>
+    </div>
+
+    <!-- Backend without a database -->
+    <div class="job-card notice" id="offline-view" style="display:none;">
+      <strong>Driver app unavailable</strong>
+      <span id="offline-text">The server has no database connected, so there are no driver accounts or jobs.</span>
+    </div>
+
+    <div id="app-view" style="display:none;">
+      <!-- Header -->
+      <div class="driver-header">
+        <div class="driver-profile">
+          <div class="driver-avatar">🚚</div>
+          <div>
+            <h2 style="font-size: 16px; font-weight: 700;" id="driver-name">Driver</h2>
+            <button class="link-btn" onclick="logout()">Sign out</button>
+          </div>
+        </div>
+        <div class="status-toggle" id="online-btn" role="button" tabindex="0" onclick="toggleOnline()">○ GO ONLINE</div>
+      </div>
+      <div class="error-text" id="status-error" style="text-align:center;"></div>
+
+      <!-- Earnings -->
+      <div class="earnings-card">
+        <div class="earnings-title">Today's Earnings</div>
+        <div class="earnings-val" id="earnings-total">—</div>
+        <div class="earnings-stats">
+          <div>Rides: <span class="stat-badge" id="earnings-trips">—</span></div>
+          <div>Deliveries: <span class="stat-badge" id="earnings-deliveries">—</span></div>
+          <div>Rating: <span class="stat-badge" id="earnings-rating">—</span></div>
+        </div>
+      </div>
+
+      <div class="jobs" id="jobs"></div>
+    </div>
+  </div>
+
+  <!-- e-POD Modal -->
+  <div id="pod-modal">
+    <div class="pod-dialog">
+      <div class="pod-title">
+        <span>📦</span> Proof of Delivery
+      </div>
+
+      <div class="input-group">
+        <label for="pod-otp">Recipient's 6-digit delivery PIN</label>
+        <input type="text" id="pod-otp" inputmode="numeric" maxlength="6" autocomplete="one-time-code">
+      </div>
+
+      <div class="input-group">
+        <label for="pod-recipient">Recipient full name</label>
+        <input type="text" id="pod-recipient" maxlength="100">
+      </div>
+
+      <div class="input-group">
+        <label>Recipient signature</label>
+        <div class="sig-canvas-wrap">
+          <button class="clear-btn" type="button" onclick="clearCanvas()">Clear</button>
+          <canvas id="sig-pad"></canvas>
+        </div>
+      </div>
+      <div class="error-text" id="pod-error"></div>
+
+      <div class="btn-row">
+        <button class="btn-action btn-secondary" onclick="closePodModal()">Cancel</button>
+        <button class="btn-action" id="pod-submit" onclick="submitPod()">✓ Confirm dropoff</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const TOKEN_KEY = 'nexus_driver_token';
+    const NAME_KEY = 'nexus_driver_name';
+    const $ = (id) => document.getElementById(id);
+    const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const money = (v) => `$${Number(v || 0).toFixed(2)}`;
+    const store = {
+      get(k) { try { return sessionStorage.getItem(k); } catch { return null; } },
+      set(k, v) { try { v == null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, v); } catch { /* storage unavailable */ } },
+    };
+
+    let jobsTimer = null;
+    let online = false;
+    let podDeliveryId = null;
+    let signed = false;
+
+    async function api(path, options = {}) {
+      const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+      const token = store.get(TOKEN_KEY);
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const res = await fetch(`/api/v1${path}`, { ...options, headers });
+      let body = null;
+      try { body = await res.json(); } catch { /* empty body */ }
+      if (res.status === 401 && path !== '/auth/login') { logout(); throw new Error('Session expired. Sign in again.'); }
+      if (res.status === 503) { showView('offline'); throw new Error(body?.error || 'Service unavailable'); }
+      if (!res.ok) throw new Error(body?.error || `Request failed (${res.status})`);
+      return body;
+    }
+
+    function showView(name) {
+      $('login-view').style.display = name === 'login' ? '' : 'none';
+      $('offline-view').style.display = name === 'offline' ? '' : 'none';
+      $('app-view').style.display = name === 'app' ? '' : 'none';
+      if (name !== 'app') clearInterval(jobsTimer);
+    }
+
+    async function login(e) {
+      e.preventDefault();
+      $('login-error').textContent = '';
+      try {
+        const data = await api('/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ email: $('login-email').value.trim(), password: $('login-password').value }),
+        });
+        if (data.user.role !== 'driver') { $('login-error').textContent = 'This account is not a driver account.'; return; }
+        store.set(TOKEN_KEY, data.token);
+        store.set(NAME_KEY, [data.user.first_name, data.user.last_name].filter(Boolean).join(' '));
+        $('login-password').value = '';
+        startApp();
+      } catch (err) {
+        $('login-error').textContent = err.message;
+      }
+    }
+
+    function logout() {
+      const token = store.get(TOKEN_KEY);
+      if (token) fetch('/api/v1/auth/logout', { method: 'POST', headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
+      store.set(TOKEN_KEY, null);
+      store.set(NAME_KEY, null);
+      showView('login');
+    }
+
+    function renderOnline() {
+      const btn = $('online-btn');
+      btn.textContent = online ? '● ONLINE' : '○ GO ONLINE';
+      btn.style.color = online ? 'var(--success)' : 'var(--text-muted)';
+    }
+
+    async function toggleOnline() {
+      $('status-error').textContent = '';
+      try {
+        const data = await api('/driver/status', { method: 'POST', body: JSON.stringify({ status: online ? 'offline' : 'available' }) });
+        online = data.status !== 'offline';
+        renderOnline();
+      } catch (err) {
+        $('status-error').textContent = err.message;
+      }
+    }
+
+    async function loadEarnings() {
+      try {
+        const { earnings, freight } = await api('/driver/earnings?period=today');
+        $('earnings-total').textContent = money(Number(earnings.total_earnings) + Number(freight.total_earnings));
+        $('earnings-trips').textContent = earnings.completed_trips;
+        $('earnings-deliveries').textContent = freight.completed_deliveries;
+        $('earnings-rating').textContent = earnings.avg_rating ? `⭐ ${Number(earnings.avg_rating).toFixed(2)}` : '—';
+      } catch { /* shown as dashes */ }
+    }
+
+    // Which buttons a job shows depends on its status; each maps to a driver action endpoint.
+    const DELIVERY_ACTIONS = {
+      pending: [['accept', 'Accept'], ['decline', 'Decline']],
+      pickup_scheduled: [['pickup', 'Confirm pickup (PIN)']],
+      in_transit: [['pod', '✍️ Complete with proof of delivery']],
+      out_for_delivery: [['pod', '✍️ Complete with proof of delivery']],
+    };
+    const TRIP_ACTIONS = {
+      accepted: [['accept', 'Accept'], ['decline', 'Decline']],
+      driver_en_route: [['arrive', "I've arrived"]],
+      arrived: [['start', 'Start ride (rider PIN)']],
+      in_progress: [['complete', 'Complete ride']],
+    };
+
+    function jobCard(kind, job) {
+      const actions = (kind === 'delivery' ? DELIVERY_ACTIONS : TRIP_ACTIONS)[job.status] || [];
+      const number = kind === 'delivery' ? job.delivery_number : job.trip_number;
+      const title = kind === 'delivery' ? `${number}${job.cargo_description ? ` · ${job.cargo_description}` : ''}` : number;
+      const buttons = actions.map(([action, label], i) =>
+        `<button class="btn-action ${i > 0 ? 'btn-secondary' : ''}" data-kind="${kind}" data-id="${esc(job.id)}" data-action="${action}">${esc(label)}</button>`
+      ).join('');
+      return `
+        <div class="job-card">
+          <div class="job-badge-row">
+            <div class="job-type-pill">${kind === 'delivery' ? '📦 Delivery' : '🚗 Ride'} · ${esc(job.status.replace(/_/g, ' '))}</div>
+            <div class="payout-pill">${money(job.total_fare)}</div>
+          </div>
+          <h3 style="font-size: 15px; font-weight: 700;">${esc(title)}</h3>
+          <div class="address-flow">
+            <div class="addr-point"><span>Pickup</span>${esc(job.pickup_address)}</div>
+            <div class="addr-point"><span>Dropoff</span>${esc(job.dropoff_address)}</div>
+          </div>
+          ${buttons ? `<div class="btn-row">${buttons}</div>` : ''}
+        </div>`;
+    }
+
+    async function loadJobs() {
+      try {
+        const { trips, deliveries } = await api('/driver/jobs/current');
+        const cards = [...trips.map((t) => jobCard('trip', t)), ...deliveries.map((d) => jobCard('delivery', d))];
+        $('jobs').innerHTML = cards.length ? cards.join('') : '<div class="job-card notice"><strong>No active jobs</strong>Go online to receive ride and delivery offers.</div>';
+      } catch (err) {
+        $('jobs').innerHTML = `<div class="job-card notice"><strong>Could not load jobs</strong>${esc(err.message)}</div>`;
+      }
+    }
+
+    $('jobs').addEventListener('click', async (e) => {
+      const btn = e.target.closest('button[data-action]');
+      if (!btn) return;
+      const { kind, id, action } = btn.dataset;
+      if (action === 'pod') return openPodModal(id);
+
+      $('status-error').textContent = '';
+      const body = {};
+      if (action === 'pickup' || action === 'start') {
+        const otp = prompt(action === 'pickup' ? 'Enter the pickup PIN from the sender' : "Enter the rider's PIN");
+        if (!otp) return;
+        body.otp = otp.trim();
+      }
+      btn.disabled = true;
+      try {
+        const base = kind === 'delivery' ? 'deliveries' : 'trips';
+        await api(`/driver/${base}/${encodeURIComponent(id)}/${action}`, { method: 'POST', body: JSON.stringify(body) });
+        await Promise.all([loadJobs(), loadEarnings()]);
+      } catch (err) {
+        // Offers expire after a short window; a 404/409 usually means the job moved on.
+        const stale = /not found|cannot/i.test(err.message);
+        $('status-error').textContent = stale ? 'That job is no longer available to you. The list has been refreshed.' : err.message;
+        btn.disabled = false;
+        await loadJobs();
+      }
+    });
+
+    // Signature pad
+    const canvas = $('sig-pad');
+    const ctx = canvas.getContext('2d');
+    let drawing = false;
+
+    function resizeCanvas() {
+      canvas.width = canvas.parentElement.clientWidth;
+      canvas.height = 140;
+      ctx.strokeStyle = '#00e5ff';
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+    }
+    function point(e) {
+      const rect = canvas.getBoundingClientRect();
+      const src = e.touches ? e.touches[0] : e;
+      return [src.clientX - rect.left, src.clientY - rect.top];
+    }
+    function startDraw(e) {
+      e.preventDefault();
+      drawing = true;
+      ctx.beginPath();
+      ctx.moveTo(...point(e));
+    }
+    function draw(e) {
+      if (!drawing) return;
+      e.preventDefault();
+      ctx.lineTo(...point(e));
+      ctx.stroke();
+      signed = true;
+    }
+    function stopDraw() { drawing = false; }
+    function clearCanvas() { ctx.clearRect(0, 0, canvas.width, canvas.height); signed = false; }
+
+    canvas.addEventListener('mousedown', startDraw);
+    canvas.addEventListener('mousemove', draw);
+    window.addEventListener('mouseup', stopDraw);
+    canvas.addEventListener('touchstart', startDraw, { passive: false });
+    canvas.addEventListener('touchmove', draw, { passive: false });
+    window.addEventListener('touchend', stopDraw);
+
+    function openPodModal(deliveryId) {
+      podDeliveryId = deliveryId;
+      $('pod-otp').value = '';
+      $('pod-recipient').value = '';
+      $('pod-error').textContent = '';
+      $('pod-modal').style.display = 'flex';
+      setTimeout(() => { resizeCanvas(); clearCanvas(); }, 50);
+    }
+    function closePodModal() {
+      $('pod-modal').style.display = 'none';
+      podDeliveryId = null;
+    }
+
+    async function submitPod() {
+      const otp = $('pod-otp').value.trim();
+      const recipient = $('pod-recipient').value.trim();
+      if (!/^\d{6}$/.test(otp)) { $('pod-error').textContent = 'Enter the 6-digit PIN.'; return; }
+      if (!recipient) { $('pod-error').textContent = "Enter the recipient's name."; return; }
+      if (!signed) { $('pod-error').textContent = 'Ask the recipient to sign.'; return; }
+
+      $('pod-submit').disabled = true;
+      try {
+        await api(`/driver/deliveries/${encodeURIComponent(podDeliveryId)}/deliver`, {
+          method: 'POST',
+          body: JSON.stringify({ otp, recipient_name: recipient, pod_signature: canvas.toDataURL('image/png') }),
+        });
+        closePodModal();
+        await Promise.all([loadJobs(), loadEarnings()]);
+      } catch (err) {
+        $('pod-error').textContent = err.message;
+      } finally {
+        $('pod-submit').disabled = false;
+      }
+    }
+
+    async function startApp() {
+      $('driver-name').textContent = store.get(NAME_KEY) || 'Driver';
+      renderOnline();
+      showView('app');
+      await Promise.all([loadJobs(), loadEarnings()]);
+      clearInterval(jobsTimer);
+      jobsTimer = setInterval(loadJobs, 5000);
+    }
+
+    (async function init() {
+      if (store.get(TOKEN_KEY)) return startApp();
+      try {
+        // Without a database there are no driver accounts, so skip the sign-in form.
+        const ready = await fetch('/ready').then((r) => r.json());
+        if (ready.checks && ready.checks.database !== 'up') return showView('offline');
+      } catch { /* fall through to login */ }
+      showView('login');
+    })();
+  </script>
+</body>
+</html>

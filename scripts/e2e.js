@@ -356,10 +356,19 @@ async function run() {
   check('public tracking never leaks OTPs', !JSON.stringify(r.body).match(/otp/i));
   r = await get('/track/' + 'f'.repeat(24));
   check('unknown tracking slug -> 404', r.status === 404);
+  r = await get(`/track/${del.delivery_number}`);
+  check('guessable delivery number does not open public tracking (404)', r.status === 404, r.status);
+  r = await get(`/track/${slug}/temperature-report`);
+  check('temperature report is refused for a non-refrigerated delivery (404)', r.status === 404, r.status);
   r = await post(`/driver/deliveries/${del.id}/deliver`, { otp: del.pickup_otp }, { token: drvAToken });
   check('drop-off requires the drop-off OTP, not the pickup OTP (403)', r.status === 403, r);
-  r = await post(`/driver/deliveries/${del.id}/deliver`, { otp: del.dropoff_otp }, { token: drvAToken });
-  check('delivery is completed with earnings', r.status === 200 && r.body.status === 'delivered' && r.body.driver_earnings > 0, r);
+  r = await post(`/driver/deliveries/${del.id}/deliver`, { otp: del.dropoff_otp, pod_signature: 'javascript:alert(1)' }, { token: drvAToken });
+  check('a signature that is not a PNG data URL is rejected (400)', r.status === 400, r);
+  const signaturePng = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  r = await post(`/driver/deliveries/${del.id}/deliver`, { otp: del.dropoff_otp, recipient_name: 'Dana Reyes', pod_signature: signaturePng }, { token: drvAToken });
+  check('delivery is completed with earnings and proof of delivery', r.status === 200 && r.body.status === 'delivered' && r.body.driver_earnings > 0 && r.body.pod.signature_captured && r.body.pod.recipient_name === 'Dana Reyes', r);
+  r = await get(`/track/${slug}`);
+  check('public tracking shows delivery with signature captured, without exposing it', r.body.delivery.status === 'delivered' && r.body.delivery.signature_captured === true && !JSON.stringify(r.body).includes('base64'), r.body.delivery);
   r = await get(`/deliveries/${del.id}`, { token: custToken });
   check('customer sees the delivered status and keeps their OTPs', r.status === 200 && r.body.delivery.status === 'delivered' && r.body.delivery.dropoff_otp, r.body);
 
@@ -373,6 +382,8 @@ async function run() {
   check('in-range reading is logged, no alert', r.status === 200 && r.body.is_excursion === false, r);
   r = await post('/cold-chain/telemetry', { delivery_id: cold.delivery_number, temperature_c: 14.2, battery_pct: 70 }, { headers: { 'x-device-key': DEVICE_KEY } });
   check('out-of-range reading raises a critical alert', r.status === 200 && r.body.is_excursion && r.body.severity === 'critical', r);
+  r = await get(`/track/${cold.tracking_url.split('/').pop()}/temperature-report`);
+  check('temperature report reflects the recorded excursion', r.status === 200 && r.body.verdict === 'OUT_OF_RANGE_NOW' && r.body.temperature.excursion_readings === 1 && r.body.temperature.current_c === 14.2, r.body);
   r = await post('/cold-chain/telemetry', { delivery_id: cold.delivery_number, temperature_c: 4 }, { headers: { 'x-device-key': 'wrong' } });
   check('wrong device key is rejected', r.status === 401, r);
   r = await post('/cold-chain/telemetry', { delivery_id: 'DEL-DOES-NOT-EXIST', temperature_c: 4 }, { token: adminToken });

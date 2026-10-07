@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>NEXUS Live Tracking & Sensor Telemetry</title>
+  
+  <!-- Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Leaflet Map CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <style>
+    :root {
+      --bg-dark: #090d16;
+      --card-bg: rgba(16, 23, 38, 0.85);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --primary: #00e5ff;
+      --primary-glow: rgba(0, 229, 255, 0.25);
+      --accent: #6366f1;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text);
+      overflow-x: hidden;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top Nav */
+    header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 60px;
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(9, 13, 22, 0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--card-border);
+      z-index: 1000;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--text);
+    }
+
+    .logo-badge {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 16px;
+      color: #000;
+      box-shadow: 0 0 15px var(--primary-glow);
+    }
+
+    .brand-title {
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: 0.5px;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 8px currentColor;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.9); }
+    }
+
+    /* Layout */
+    .app-container {
+      display: flex;
+      flex: 1;
+      margin-top: 60px;
+      position: relative;
+      height: calc(100vh - 60px);
+    }
+
+    #map {
+      flex: 1;
+      /* No height: 100% here: the container's height comes from flex sizing, so a
+         percentage resolves to 0. The default stretch fills it instead. */
+      z-index: 1;
+      background: #0b0f19;
+    }
+
+    /* Floating Tracking Panel */
+    .tracking-sheet {
+      position: absolute;
+      bottom: 24px;
+      left: 24px;
+      width: 440px;
+      max-width: calc(100vw - 48px);
+      max-height: calc(100vh - 108px);
+      overflow-y: auto;
+      background: var(--card-bg);
+      backdrop-filter: blur(24px);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      z-index: 1000;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @media (max-width: 768px) {
+      .app-container {
+        flex-direction: column;
+      }
+      .tracking-sheet {
+        position: static;
+        width: 100%;
+        max-width: 100%;
+        border-radius: 24px 24px 0 0;
+        bottom: 0;
+        left: 0;
+        max-height: 55vh;
+        border-left: none;
+        border-right: none;
+        border-bottom: none;
+        box-shadow: 0 -10px 30px rgba(0,0,0,0.5);
+      }
+      #map {
+        height: 45vh;
+      }
+    }
+
+    /* ETA Header */
+    .eta-box {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 16px;
+    }
+
+    .eta-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .eta-value {
+      font-size: 32px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+
+    .eta-unit {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--primary);
+    }
+
+    .order-id {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--primary);
+      background: rgba(0, 229, 255, 0.1);
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(0, 229, 255, 0.2);
+    }
+
+    /* Timeline Route */
+    .route-stepper {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      position: relative;
+    }
+
+    .step-item {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      position: relative;
+    }
+
+    .step-icon-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 20px;
+    }
+
+    .step-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 2px solid var(--primary);
+      background: var(--bg-dark);
+      margin-top: 4px;
+      flex-shrink: 0;
+    }
+
+    .step-dot.completed {
+      background: var(--primary);
+      box-shadow: 0 0 10px var(--primary-glow);
+    }
+
+    .step-line {
+      width: 2px;
+      height: 28px;
+      background: rgba(255, 255, 255, 0.1);
+      margin-top: 4px;
+    }
+
+    .step-content {
+      flex: 1;
+    }
+
+    .step-title {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+
+    .step-addr {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin-top: 2px;
+    }
+
+    /* Cold Chain Sensor Widget */
+    .sensor-card {
+      background: rgba(11, 16, 28, 0.9);
+      border: 1px solid rgba(0, 229, 255, 0.2);
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .sensor-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: var(--primary);
+    }
+
+    .sensor-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .sensor-title {
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .temp-display {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+    }
+
+    .temp-digits {
+      font-size: 34px;
+      font-weight: 800;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text);
+    }
+
+    .temp-spec {
+      text-align: right;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .spec-range {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+      color: var(--primary);
+    }
+
+    /* Stability Budget Progress */
+    .stability-wrap {
+      margin-top: 4px;
+    }
+
+    .stability-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 20%;
+      background: linear-gradient(90deg, var(--success), var(--warning));
+      border-radius: 10px;
+      transition: width 0.5s ease;
+    }
+
+    /* Driver Card */
+    .driver-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+    }
+
+    .driver-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .driver-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #1e293b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .driver-name {
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .vehicle-tag {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .actions-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .action-btn {
+      padding: 8px 12px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+
+    .action-btn:hover {
+      background: var(--primary);
+      color: #000;
+      border-color: var(--primary);
+    }
+
+    /* Certificate Modal */
+    #cert-btn {
+      background: rgba(99, 102, 241, 0.15);
+      border-color: rgba(99, 102, 241, 0.3);
+      color: #a5b4fc;
+      justify-content: center;
+      width: 100%;
+      padding: 10px;
+      border-radius: 12px;
+    }
+    #cert-btn:hover {
+      background: var(--accent);
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <a href="/index.html" class="brand">
+      <div class="logo-badge">N</div>
+      <div class="brand-title">NEXUS TRACK</div>
+    </a>
+    <div class="status-badge" id="shipment-status-pill">
+      <span class="status-dot"></span>
+      <span id="shipment-status-text">LOADING</span>
+    </div>
+  </header>
+
+  <div class="app-container">
+    <div id="map"></div>
+
+    <div class="tracking-sheet" id="tracking-sheet">
+      <!-- ETA & ID -->
+      <div class="eta-box">
+        <div>
+          <div class="eta-label">Estimated Delivery</div>
+          <div class="eta-value" id="eta-display">
+            — <span class="eta-unit">MIN</span>
+          </div>
+        </div>
+        <div class="order-id" id="tracking-id-pill">—</div>
+      </div>
+
+      <!-- Route Stepper -->
+      <div class="route-stepper">
+        <div class="step-item">
+          <div class="step-icon-wrap">
+            <div class="step-dot completed"></div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-content">
+            <div class="step-title">Origin & Pickup</div>
+            <div class="step-addr" id="pickup-addr">—</div>
+          </div>
+        </div>
+        <div class="step-item">
+          <div class="step-icon-wrap">
+            <div class="step-dot"></div>
+          </div>
+          <div class="step-content">
+            <div class="step-title">Destination</div>
+            <div class="step-addr" id="dropoff-addr">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cold Chain IoT Live Section -->
+      <div class="sensor-card" id="coldchain-box" style="display:none;">
+        <div class="sensor-header">
+          <div class="sensor-title">
+            <span>❄️</span> Cold Chain IoT Telemetry
+          </div>
+          <div style="font-size: 11px; color: var(--success); font-weight: 700;" id="spec-status-text">
+            —
+          </div>
+        </div>
+
+        <div class="temp-display">
+          <div class="temp-digits" id="live-temp-display">—</div>
+          <div class="temp-spec">
+            Target Range<br>
+            <span class="spec-range" id="spec-range-display">—</span>
+          </div>
+        </div>
+
+        <div class="stability-wrap">
+          <div class="stability-labels">
+            <span>Out-of-range readings</span>
+            <span id="excursion-count-text">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Driver & Vehicle -->
+      <div class="driver-card">
+        <div class="driver-info">
+          <div class="driver-avatar">👨‍✈️</div>
+          <div>
+            <div class="driver-name" id="driver-name-display">Driver not assigned yet</div>
+            <div class="vehicle-tag" id="vehicle-display"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Compliance Certificate Button -->
+      <button class="action-btn" id="cert-btn" style="display:none;" onclick="openTemperatureReport()">
+        📄 Temperature report
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // The slug comes from /track/<slug> or /track.html?id=<slug>.
+    const urlParams = new URLSearchParams(window.location.search);
+    const pathMatch = window.location.pathname.match(/\/track\/([^/]+)\/?$/);
+    const slug = pathMatch ? decodeURIComponent(pathMatch[1]) : (urlParams.get('id') || '').trim();
+
+    const $ = (id) => document.getElementById(id);
+    let currentDelivery = null;
+    let map = null;
+    let driverMarker = null;
+    let routeLine = null;
+    let pollTimer = null;
+
+    function initMap(pLat, pLng, dLat, dLng, cLat, cLng) {
+      map = L.map('map', { zoomControl: false }).setView([cLat, cLng], 13);
+      // OpenStreetMap tiles need no API key; their usage policy requires the attribution.
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(map);
+      L.control.zoom({ position: 'topright' }).addTo(map);
+
+      const pin = (color) => L.divIcon({
+        className: 'custom-pin',
+        html: `<div style="background:${color};width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 10px ${color};"></div>`,
+        iconSize: [14, 14]
+      });
+      const vehicleIcon = L.divIcon({
+        className: 'custom-pin',
+        html: `<div style="background:#10b981;padding:6px;border-radius:10px;border:2px solid #fff;box-shadow:0 0 15px rgba(16,185,129,0.8);font-size:16px;">🚚</div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
+      });
+
+      L.marker([pLat, pLng], { icon: pin('#00e5ff') }).addTo(map);
+      L.marker([dLat, dLng], { icon: pin('#ef4444') }).addTo(map);
+      driverMarker = L.marker([cLat, cLng], { icon: vehicleIcon }).addTo(map);
+      routeLine = L.polyline([[pLat, pLng], [cLat, cLng], [dLat, dLng]], {
+        color: '#00e5ff', weight: 4, opacity: 0.8, dashArray: '8, 8'
+      }).addTo(map);
+      map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
+    }
+
+    function showMessage(title, body) {
+      $('shipment-status-text').textContent = title.toUpperCase();
+      $('tracking-sheet').innerHTML = `
+        <div style="text-align:center;padding:28px 12px;">
+          <div style="font-size:32px;margin-bottom:10px;">📦</div>
+          <h3 style="font-size:16px;margin-bottom:6px;">${title}</h3>
+          <p style="font-size:13px;color:var(--text-muted);">${body}</p>
+        </div>`;
+    }
+
+    function numOrNull(v) {
+      const n = Number(v);
+      return v == null || v === '' || Number.isNaN(n) ? null : n;
+    }
+
+    async function loadTrackingData() {
+      let res;
+      try {
+        res = await fetch(`/api/v1/track/${encodeURIComponent(slug)}`);
+      } catch {
+        // Network blip: keep showing the last data and try again on the next poll.
+        $('shipment-status-text').textContent = 'RECONNECTING…';
+        return;
+      }
+      if (res.status === 404) {
+        clearInterval(pollTimer);
+        showMessage('Tracking link not found', 'Check the link you were sent, or contact the sender.');
+        return;
+      }
+      if (!res.ok) return;
+      const data = await res.json();
+      currentDelivery = data.delivery;
+      renderDelivery(currentDelivery);
+      if (['delivered', 'cancelled', 'failed'].includes(currentDelivery.status)) clearInterval(pollTimer);
+    }
+
+    function renderDelivery(d) {
+      $('tracking-id-pill').textContent = d.delivery_number || slug;
+      $('shipment-status-text').textContent = (d.status || 'unknown').replace(/_/g, ' ').toUpperCase() + (d.is_demo ? ' · DEMO' : '');
+      $('pickup-addr').textContent = d.pickup_address || '—';
+      $('dropoff-addr').textContent = d.dropoff_address || '—';
+
+      if (d.delivered_at) {
+        $('eta-display').innerHTML = 'Delivered';
+      } else if (d.estimated_delivery_at) {
+        const mins = Math.max(0, Math.round((new Date(d.estimated_delivery_at) - Date.now()) / 60000));
+        $('eta-display').innerHTML = `${mins} <span class="eta-unit">MIN</span>`;
+      }
+
+      if (d.driver_first_name) $('driver-name-display').textContent = d.driver_first_name;
+      $('vehicle-display').textContent = [[d.make, d.model].filter(Boolean).join(' '), d.plate_number].filter(Boolean).join(' • ');
+
+      const t = d.temperature;
+      if (t) {
+        $('coldchain-box').style.display = 'flex';
+        $('cert-btn').style.display = '';
+        $('live-temp-display').textContent = t.current_c != null ? `${t.current_c.toFixed(1)}°C` : '—';
+        $('spec-range-display').textContent = t.min_c != null && t.max_c != null ? `${t.min_c.toFixed(1)}°C – ${t.max_c.toFixed(1)}°C` : 'Not set';
+        const label = { IN_RANGE: ['✓ WITHIN SPEC', 'var(--success)'], RECOVERED: ['✓ BACK IN RANGE', 'var(--success)'], OUT_OF_RANGE: ['⚠ OUT OF RANGE', '#ef4444'], NO_DATA: ['NO READINGS YET', 'var(--text-muted)'] }[t.status];
+        $('spec-status-text').textContent = label[0];
+        $('spec-status-text').style.color = label[1];
+        $('excursion-count-text').textContent = String(t.excursion_readings);
+      } else {
+        $('coldchain-box').style.display = 'none';
+        $('cert-btn').style.display = 'none';
+      }
+
+      const pLat = numOrNull(d.pickup_lat), pLng = numOrNull(d.pickup_lng);
+      const dLat = numOrNull(d.dropoff_lat), dLng = numOrNull(d.dropoff_lng);
+      if (pLat == null || pLng == null || dLat == null || dLng == null) return;
+      const cLat = numOrNull(d.current_lat) ?? pLat;
+      const cLng = numOrNull(d.current_lng) ?? pLng;
+      if (!map) {
+        initMap(pLat, pLng, dLat, dLng, cLat, cLng);
+      } else {
+        driverMarker.setLatLng([cLat, cLng]);
+        routeLine.setLatLngs([[pLat, pLng], [cLat, cLng], [dLat, dLng]]);
+      }
+    }
+
+    async function openTemperatureReport() {
+      try {
+        const res = await fetch(`/api/v1/track/${encodeURIComponent(slug)}/temperature-report`);
+        if (!res.ok) throw new Error((await res.json()).error || 'Report unavailable');
+        const r = await res.json();
+        const t = r.temperature;
+        const fmt = (v) => (v == null ? '—' : `${v.toFixed(1)}°C`);
+        alert(
+          `Temperature report ${r.report_id}${r.is_demo ? ' (demo data)' : ''}\n\n` +
+          `Cargo: ${r.cargo_description || '—'}\n` +
+          `Target range: ${fmt(t.min_c)} – ${fmt(t.max_c)}\n` +
+          `Latest reading: ${fmt(t.current_c)}\n` +
+          `Out-of-range readings: ${t.excursion_readings}\n` +
+          `Result: ${r.verdict.replace(/_/g, ' ').toLowerCase()}`
+        );
+      } catch (err) {
+        alert(`Could not load the temperature report: ${err.message}`);
+      }
+    }
+
+    if (!slug) {
+      showMessage('No tracking code', 'Open the tracking link you were sent, e.g. /track/&lt;code&gt;. In demo mode try <a href="/track/DEL-44200" style="color:var(--primary)">/track/DEL-44200</a>.');
+    } else {
+      loadTrackingData();
+      pollTimer = setInterval(loadTrackingData, 10000);
+    }
+  </script>
+</body>
+</html>

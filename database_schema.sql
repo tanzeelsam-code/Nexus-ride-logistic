@@ -486,6 +486,7 @@ CREATE TABLE deliveries (
   dropoff_otp             CHAR(6),
   dropoff_signature_url   TEXT,
   dropoff_photo_url       TEXT,
+  dropoff_recipient_name  VARCHAR(100),                        -- Who signed for it (proof of delivery)
   delivered_at            TIMESTAMP WITH TIME ZONE,
   
   -- Tracking
