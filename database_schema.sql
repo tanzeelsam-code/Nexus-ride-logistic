@@ -100,6 +100,7 @@ CREATE INDEX idx_users_phone ON users(phone);
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_role ON users(role);
 CREATE INDEX idx_users_referral ON users(referral_code);
+CREATE INDEX idx_users_referred_by ON users(referred_by);
 
 -- ============================================================
 -- DRIVERS TABLE (extends users)
@@ -396,6 +397,9 @@ CREATE INDEX idx_trips_driver ON trips(driver_id);
 CREATE INDEX idx_trips_status ON trips(status);
 CREATE INDEX idx_trips_requested ON trips(requested_at DESC);
 CREATE INDEX idx_trips_number ON trips(trip_number);
+CREATE INDEX idx_trips_vehicle ON trips(vehicle_id);
+CREATE INDEX idx_trips_zone ON trips(zone_id);
+CREATE INDEX idx_trips_surge_zone ON trips(surge_zone_id);
 
 -- ============================================================
 -- DRIVER LOCATION HISTORY (TimescaleDB Hypertable)
@@ -541,6 +545,8 @@ CREATE INDEX idx_deliveries_customer ON deliveries(customer_id);
 CREATE INDEX idx_deliveries_driver ON deliveries(driver_id);
 CREATE INDEX idx_deliveries_status ON deliveries(status);
 CREATE INDEX idx_deliveries_tracking ON deliveries(tracking_url);
+CREATE INDEX idx_deliveries_vehicle ON deliveries(vehicle_id);
+CREATE INDEX idx_deliveries_zone ON deliveries(zone_id);
 
 -- ============================================================
 -- PAYMENTS
@@ -662,6 +668,12 @@ CREATE TABLE safety_incidents (
   created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+CREATE INDEX idx_safety_incidents_trip ON safety_incidents(trip_id);
+CREATE INDEX idx_safety_incidents_delivery ON safety_incidents(delivery_id);
+CREATE INDEX idx_safety_incidents_driver ON safety_incidents(driver_id);
+CREATE INDEX idx_safety_incidents_customer ON safety_incidents(customer_id);
+CREATE INDEX idx_safety_incidents_resolved_by ON safety_incidents(resolved_by);
+
 -- ============================================================
 -- NOTIFICATIONS
 -- ============================================================
@@ -753,6 +765,8 @@ CREATE TABLE driver_documents (
   CONSTRAINT unique_driver_doc_type UNIQUE(driver_id, type)
 );
 
+CREATE INDEX idx_driver_documents_verified_by ON driver_documents(verified_by);
+
 -- ============================================================
 -- FLEET MAINTENANCE
 -- ============================================================
@@ -783,6 +797,8 @@ CREATE TABLE vehicle_maintenance (
   created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+CREATE INDEX idx_vehicle_maintenance_vehicle ON vehicle_maintenance(vehicle_id);
+
 -- ============================================================
 -- AUDIT LOG
 -- ============================================================
@@ -803,6 +819,7 @@ CREATE TABLE audit_logs (
 );
 
 SELECT create_hypertable('audit_logs', 'created_at');
+CREATE INDEX idx_audit_logs_actor ON audit_logs(actor_id);
 
 -- ============================================================
 -- VIEWS
