@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NEXUS RIDE — Taxi Command Center</title>
+<title>NEXORA RIDE — Taxi Command Center</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
 
 /* ═══════════════════════════════════════════════════
-   NEXUS RIDE — ELECTRIC BLUE / DARK THEME
+   NEXORA RIDE — ELECTRIC BLUE / DARK THEME
    Identity: Fast, sleek, urban mobility
 ═══════════════════════════════════════════════════ */
 
@@ -22,7 +22,7 @@
   --border:rgba(255,255,255,0.07);
   --border2:rgba(255,255,255,0.13);
 
-  --ride:#00d4ff;        /* Electric cyan — NEXUS RIDE brand */
+  --ride:#00d4ff;        /* Electric cyan — NEXORA RIDE brand */
   --ride2:#0099ff;
   --ride-glow:rgba(0,212,255,0.18);
   --amber:#ffb547;
@@ -336,7 +336,7 @@ body::before{
     <div class="brand">
       <div class="brand-mark">🚕</div>
       <div>
-        <div class="brand-name">NEXUS<em> RIDE</em></div>
+        <div class="brand-name">NEXORA<em> RIDE</em></div>
         <div class="brand-tag">Taxi Division</div>
       </div>
     </div>
@@ -350,8 +350,8 @@ body::before{
     <div class="top-time" id="clock">—</div>
 
     <div class="div-switcher">
-      <div class="div-btn ride">🚕 NEXUS RIDE</div>
-      <div class="div-btn freight" onclick="window.location.href='freight.html'">📦 NEXUS FREIGHT →</div>
+      <div class="div-btn ride">🚕 NEXORA RIDE</div>
+      <div class="div-btn freight" onclick="window.location.href='freight.html'">📦 NEXORA FREIGHT →</div>
     </div>
   </header>
 
@@ -382,7 +382,7 @@ body::before{
     <div class="s-item" onclick="setNav(this)"><span class="s-ico">💳</span>Finance</div>
 
     <div class="ai-brain">
-      <div class="ai-brain-title">NEXUS CORE — RIDE</div>
+      <div class="ai-brain-title">NEXORA CORE — RIDE</div>
       <div class="ai-row"><span>DispatchBrain</span><span class="ai-val up" id="ai1">94.2%</span></div>
       <div class="ai-row"><span>ETA Prophet</span><span class="ai-val up" id="ai2">91.8%</span></div>
       <div class="ai-row"><span>PricingEngine</span><span class="ai-val up" id="ai3">Optimal</span></div>
@@ -769,7 +769,7 @@ function renderRP(type='queue'){
     body.innerHTML=`
       <div style="padding:20px 0;text-align:center;color:var(--txt2)">
         <div style="font-size:32px;margin-bottom:10px">🧠</div>
-        <div style="font-size:13px;font-weight:600;margin-bottom:6px">NexusChat AI</div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:6px">NexoraChat AI</div>
         <div style="font-size:11px">Claude-powered support for drivers, customers, and operations</div>
         <div style="margin-top:20px;background:var(--dark2);border-radius:12px;padding:16px;border:1px solid var(--border);text-align:left">
           <div style="font-size:10px;font-family:var(--mono);color:var(--ride);margin-bottom:8px">▸ RECENT ACTIONS</div>
@@ -793,6 +793,6 @@ setInterval(()=>{
   document.getElementById('ai2').textContent=(90+Math.random()*3).toFixed(1)+'%';
 },5000);
 </script>
-<script src="nexus-client.js"></script>
+<script src="nexora-client.js"></script>
 </body>
 </html>

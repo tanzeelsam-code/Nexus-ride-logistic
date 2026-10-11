@@ -1,5 +1,5 @@
 # ================================================================
-# NEXUS LOGISTICS — Full Stack Docker Compose
+# NEXORA LOGISTICS — Full Stack Docker Compose
 # ================================================================
 
 services:
@@ -7,7 +7,7 @@ services:
   # ── PostgreSQL + TimescaleDB ──────────────────────────────────
   postgres:
     image: timescale/timescaledb-ha:pg15-latest
-    container_name: nexus-postgres
+    container_name: nexora-postgres
     environment:
       POSTGRES_USER: nexus
       POSTGRES_PASSWORD: ${DB_PASSWORD}
@@ -32,7 +32,7 @@ services:
   # ── Redis ─────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
-    container_name: nexus-redis
+    container_name: nexora-redis
     command: redis-server --requirepass ${REDIS_PASSWORD} --maxmemory 2gb --maxmemory-policy allkeys-lru
     ports:
       - "127.0.0.1:6379:6379"
@@ -47,7 +47,7 @@ services:
   #   docker compose --profile streaming up
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.0
-    container_name: nexus-zookeeper
+    container_name: nexora-zookeeper
     profiles: [ "streaming" ]
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
@@ -55,7 +55,7 @@ services:
 
   kafka:
     image: confluentinc/cp-kafka:7.4.0
-    container_name: nexus-kafka
+    container_name: nexora-kafka
     profiles: [ "streaming" ]
     depends_on: [ zookeeper ]
     ports:
@@ -76,7 +76,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.api
-    container_name: nexus-api
+    container_name: nexora-api
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -112,7 +112,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.ai
-    container_name: nexus-ai
+    container_name: nexora-ai
     depends_on:
       redis: { condition: service_healthy }
     environment:
@@ -141,7 +141,7 @@ services:
   # ── Nginx Reverse Proxy ───────────────────────────────────────
   nginx:
     image: nginx:alpine
-    container_name: nexus-nginx
+    container_name: nexora-nginx
     depends_on:
       api: { condition: service_healthy }
     ports:
@@ -149,14 +149,14 @@ services:
       - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./ssl:/etc/ssl/nexus:ro
+      - ./ssl:/etc/ssl/nexora:ro
       - ./frontend:/usr/share/nginx/html:ro
     restart: unless-stopped
 
   # ── Monitoring ────────────────────────────────────────────────
   prometheus:
     image: prom/prometheus:latest
-    container_name: nexus-prometheus
+    container_name: nexora-prometheus
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
@@ -168,7 +168,7 @@ services:
 
   grafana:
     image: grafana/grafana:latest
-    container_name: nexus-grafana
+    container_name: nexora-grafana
     depends_on: [ prometheus ]
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
@@ -189,5 +189,5 @@ volumes:
 
 networks:
   default:
-    name: nexus-network
+    name: nexora-network
     driver: bridge

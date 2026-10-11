@@ -1,30 +1,30 @@
-# NEXUS LOGISTICS — MASTER PLAN
+# NEXORA LOGISTICS — MASTER PLAN
 ## AI-Powered Dual-Mode Transportation Platform
 
 ---
 
 ## EXECUTIVE SUMMARY
 
-NEXUS LOGISTICS is a next-generation transportation company operating two verticals:
-- **NEXUS RIDE** — Real-time AI-dispatched taxi & passenger mobility
-- **NEXUS FREIGHT** — Intelligent goods transport (last-mile, bulk, cold-chain)
+NEXORA LOGISTICS is a next-generation transportation company operating two verticals:
+- **NEXORA RIDE** — Real-time AI-dispatched taxi & passenger mobility
+- **NEXORA FREIGHT** — Intelligent goods transport (last-mile, bulk, cold-chain)
 
-Both verticals share a single AI brain: the **NEXUS CORE** — a multi-model AI system that handles routing, dynamic pricing, demand forecasting, fleet optimization, and autonomous decision-making.
+Both verticals share a single AI brain: the **NEXORA CORE** — a multi-model AI system that handles routing, dynamic pricing, demand forecasting, fleet optimization, and autonomous decision-making.
 
 ---
 
 ## 1. COMPANY ARCHITECTURE
 
 ```
-NEXUS LOGISTICS GROUP
-├── NEXUS RIDE (Taxi/Passenger)
+NEXORA LOGISTICS GROUP
+├── NEXORA RIDE (Taxi/Passenger)
 │   ├── Standard Rides (Sedan, Hatchback)
 │   ├── Premium Rides (Luxury, SUV)
 │   ├── Shared Rides (Pooling with AI seat optimization)
 │   ├── Medical Transport (Priority + Insurance Integration)
 │   └── Airport Shuttle (Scheduled + On-demand)
 │
-└── NEXUS FREIGHT (Goods Transport)
+└── NEXORA FREIGHT (Goods Transport)
     ├── Last-Mile Delivery (Urban micro-logistics)
     ├── Intercity Freight (Long-haul trucks)
     ├── Cold-Chain (Temperature-monitored vehicles)
@@ -34,7 +34,7 @@ NEXUS LOGISTICS GROUP
 
 ---
 
-## 2. AI SYSTEM — NEXUS CORE
+## 2. AI SYSTEM — NEXORA CORE
 
 ### 2.1 AI Modules
 
@@ -48,7 +48,7 @@ NEXUS LOGISTICS GROUP
 | **ETA Prophet** | XGBoost + weather API | Accurate arrival prediction |
 | **FraudSentinel** | Anomaly detection (Isolation Forest) | Payment + account fraud |
 | **CarbonTracker** | Emission calculation model | ESG reporting |
-| **NexusChat** | LLM (Fine-tuned Claude) | Customer support + operations |
+| **NexoraChat** | LLM (Fine-tuned Claude) | Customer support + operations |
 | **LoadOptimizer** | Bin-packing + RL | Freight load planning |
 
 ### 2.2 Data Pipeline
@@ -64,7 +64,7 @@ NEXUS LOGISTICS GROUP
 
 ### 2.3 AI Decision Loop
 
-Every 500ms, NEXUS CORE:
+Every 500ms, NEXORA CORE:
 1. Ingests all live vehicle GPS, customer requests, traffic data
 2. Runs DispatchBrain to compute optimal assignments
 3. Recalculates ETAs via ETA Prophet
@@ -128,13 +128,13 @@ Every 500ms, NEXUS CORE:
 
 ## 5. BUSINESS MODEL
 
-### NEXUS RIDE Revenue
+### NEXORA RIDE Revenue
 - Commission: 18-22% per ride
-- Subscription: "NEXUS PASS" — unlimited rides for flat monthly fee
+- Subscription: "NEXORA PASS" — unlimited rides for flat monthly fee
 - Corporate accounts: B2B dashboard + invoicing
 - Airport partnerships: Fixed station fees
 
-### NEXUS FREIGHT Revenue  
+### NEXORA FREIGHT Revenue
 - Per-km + weight pricing
 - Subscription warehousing partners
 - API integration fees (e-commerce platforms)
@@ -142,7 +142,7 @@ Every 500ms, NEXUS CORE:
 - Insurance add-on (1.5% of cargo value)
 
 ### AI Monetization
-- License NEXUS CORE to other transport companies
+- License NEXORA CORE to other transport companies
 - Data insights products for city planners
 - Fleet optimization SaaS
 
@@ -164,7 +164,7 @@ Every 500ms, NEXUS CORE:
 - Monthly vehicle AI inspection via photos
 
 ### Customer Support
-- L1: NexusChat AI resolves 78% of tickets
+- L1: NexoraChat AI resolves 78% of tickets
 - L2: Human agents for escalations
 - L3: Operations team for complex cases
 - Target: < 2 min first response, < 4 hour resolution
@@ -215,13 +215,13 @@ Every 500ms, NEXUS CORE:
 - 20 cities, 50,000 drivers
 - Autonomous vehicle integration trials
 - Drone delivery pilot
-- NEXUS CORE licensing product
+- NEXORA CORE licensing product
 
 ### Phase 4 (Year 3+): Dominance
 - International expansion
 - Full autonomous fleet
 - Predictive logistics (delivery before order)
-- NEXUS Exchange (B2B freight marketplace)
+- NEXORA Exchange (B2B freight marketplace)
 
 ---
 
@@ -240,4 +240,4 @@ Every 500ms, NEXUS CORE:
 
 ---
 
-*NEXUS LOGISTICS — Move Everything. Intelligently.*
+*NEXORA LOGISTICS — Move Everything. Intelligently.*

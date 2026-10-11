@@ -2,15 +2,15 @@
 set -euo pipefail
 
 # ==============================================================================
-# NEXUS LOGISTICS — Android APK Build Script
-# Packages NEXUS Ride & Freight dashboards into a signed Android APK.
+# NEXORA LOGISTICS — Android APK Build Script
+# Packages NEXORA Ride & Freight dashboards into a signed Android APK.
 # ==============================================================================
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_DIR"
 
 echo "=================================================="
-echo "⚡ NEXUS LOGISTICS — APK BUILD PIPELINE"
+echo "⚡ NEXORA LOGISTICS — APK BUILD PIPELINE"
 echo "=================================================="
 
 # 1. Locate Android SDK
@@ -86,8 +86,8 @@ echo "☕ Compiling Java source files..."
 javac --release 8 \
   -cp "$PLATFORM_JAR" \
   -d "$WORK_DIR/classes" \
-  "$WORK_DIR/gen/com/nexus/logistics/R.java" \
-  "$PROJECT_DIR/android/app/src/main/java/com/nexus/logistics/MainActivity.java"
+  "$WORK_DIR/gen/com/nexora/logistics/R.java" \
+  "$PROJECT_DIR/android/app/src/main/java/com/nexora/logistics/MainActivity.java"
 
 # 8. DEX Compilation with D8
 echo "⚙️ Converting Java bytecode to Dalvik bytecode (DEX)..."
@@ -124,13 +124,13 @@ if [ ! -f "$KEYSTORE" ]; then
       -keyalg RSA \
       -keysize 2048 \
       -validity 10000 \
-      -dname "CN=Nexus Logistics, OU=Mobile, O=Nexus, L=NYC, ST=NY, C=US"
+      -dname "CN=Nexora Logistics, OU=Mobile, O=Nexora, L=NYC, ST=NY, C=US"
   fi
 fi
 
 echo "✍️ Signing APK with apksigner ($KEYSTORE)..."
-FINAL_APK="$DIST_DIR/nexus-logistics.apk"
-GRADLE_OUT_APK="$OUT_DIR/nexus-logistics.apk"
+FINAL_APK="$DIST_DIR/nexora-logistics.apk"
+GRADLE_OUT_APK="$OUT_DIR/nexora-logistics.apk"
 
 "$APKSIGNER" sign \
   --ks "$KEYSTORE" \
@@ -160,5 +160,5 @@ echo "🚀 To install on an Android emulator or connected device:"
 echo "   adb install -r \"$FINAL_APK\""
 echo ""
 echo "▶ To launch on device:"
-echo "   adb shell am start -n com.nexus.logistics/.MainActivity"
+echo "   adb shell am start -n com.nexora.logistics/.MainActivity"
 echo "=================================================="

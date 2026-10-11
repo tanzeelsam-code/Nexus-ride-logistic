@@ -4,7 +4,7 @@ set -euo pipefail
 BASE_URL="${BASE_URL:-http://localhost}"
 RID="smoke-$(date +%s)"
 
-echo "Running NEXUS smoke checks against: ${BASE_URL}"
+echo "Running NEXORA smoke checks against: ${BASE_URL}"
 echo "Request ID: ${RID}"
 echo
 

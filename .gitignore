@@ -63,3 +63,5 @@ ssl/*.pem
 android/**/build/
 android/local.properties
 *.keystore
+
+.dev.vars*

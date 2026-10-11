@@ -2,7 +2,7 @@
 set -euo pipefail
 
 echo "========================================================"
-echo "   NEXUS LOGISTICS — FULL STACK SYSTEM VERIFICATION"
+echo "   NEXORA LOGISTICS — FULL STACK SYSTEM VERIFICATION"
 echo "========================================================"
 
 TEST_PORT=3099
@@ -12,29 +12,33 @@ export NODE_ENV="development"
 # 1. Syntax Validations
 echo "1) Checking JavaScript and Python syntax..."
 node --check backend_api.js
+node --check frontend/workspace.js
+node --check frontend/admin.js
+node --check frontend/ops.js
+node --test scripts/workspace-session.test.cjs
 python3 -m py_compile ai_engine.py
 echo "   ✅ Code syntax validation passed."
 
 # 2. Frontend Assets Check
 echo "2) Checking frontend assets..."
-for f in frontend/index.html frontend/ride.html frontend/freight.html frontend/nexus-client.js; do
+for f in frontend/index.html frontend/ride.html frontend/freight.html frontend/track.html frontend/driver.html frontend/nexora-client.js frontend/admin.html frontend/ops.html frontend/workspace.css frontend/workspace.js frontend/admin.js frontend/ops.js; do
   if [ ! -f "$f" ]; then
     echo "   ❌ Missing frontend asset: $f"
     exit 1
   fi
 done
-echo "   ✅ All frontend dashboards and nexus-client.js verified."
+echo "   ✅ All frontend dashboards and nexora-client.js verified."
 
 # 3. Spin up Backend API on ephemeral port
 echo "3) Starting backend API on port ${TEST_PORT} for integration tests..."
 # DB_PORT/REDIS_PORT point at unused ports so this check always runs in the API's no-database demo mode.
-DB_PORT=1 REDIS_PORT=1 node backend_api.js > /tmp/nexus-verify.log 2>&1 &
+DB_PORT=1 REDIS_PORT=1 node backend_api.js > /tmp/nexora-verify.log 2>&1 &
 SERVER_PID=$!
 
 cleanup() {
   echo "Stopping verification server (PID: ${SERVER_PID})..."
   kill -9 "${SERVER_PID}" 2>/dev/null || true
-  rm -f /tmp/nexus-verify.log
+  rm -f /tmp/nexora-verify.log
 }
 trap cleanup EXIT
 
@@ -53,7 +57,7 @@ echo "      Response: ${HEALTH_RES}"
 
 echo "   -> Ops Overview..."
 OPS_RES=$(curl -s "http://localhost:${TEST_PORT}/api/v1/ops/overview")
-if echo "${OPS_RES}" | grep -q "NEXUS LOGISTICS GROUP"; then
+if echo "${OPS_RES}" | grep -q "NEXORA LOGISTICS GROUP"; then
   echo "      ✅ Ops overview returned valid platform status."
 else
   echo "      ❌ Ops overview verification failed."
@@ -99,6 +103,23 @@ else
   echo "      ❌ Expected 401 from /trips, got ${AUTH_CODE}."
   exit 1
 fi
+
+echo "   -> Public tracking (demo shipments)..."
+expect_code() {
+  local code
+  code=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${TEST_PORT}$1")
+  if [ "${code}" != "$2" ]; then
+    echo "      ❌ Expected $2 from $1, got ${code}."
+    exit 1
+  fi
+}
+expect_code /api/v1/track/DEL-44200 200
+expect_code /api/v1/track/DEL-00000 404
+expect_code /api/v1/track/DEL-44200/temperature-report 200
+expect_code /api/v1/track/DEL-44201/temperature-report 404
+expect_code /track/DEL-44200 200
+expect_code /driver.html 200
+echo "      ✅ Tracking API, temperature report, share link and driver page verified."
 
 echo "   -> Prometheus Metrics..."
 METRICS_RES=$(curl -s "http://localhost:${TEST_PORT}/api/v1/metrics" | head -n 5)
