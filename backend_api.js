@@ -1,5 +1,5 @@
 /**
- * NEXUS LOGISTICS — BACKEND API
+ * NEXORA LOGISTICS — BACKEND API
  * ===============================
  * Node.js + Fastify REST API
  * Handles: Auth, Trips, Deliveries, Drivers, Payments, Real-time
@@ -14,7 +14,7 @@ const { Pool } = require('pg');
 const Redis = require('ioredis');
 const { Server: SocketIO } = require('socket.io');
 const { z } = require('zod');
-const bcrypt = require('bcrypt');
+const defaultPasswords = require('./cloudflare/passwords.cjs');
 const { v4: uuidv4 } = require('uuid');
 const Stripe = require('stripe');
 const axios = require('axios');
@@ -27,10 +27,13 @@ const fs = require('fs');
 // CONFIGURATION
 // ============================================================
 
-const isProduction = process.env.NODE_ENV === 'production';
+function createBackend(runtime = {}) {
+const bcrypt = runtime.passwords || defaultPasswords;
+const environment = runtime.env || process.env;
+const isProduction = environment.NODE_ENV === 'production';
 
 function getEnv(name, fallback) {
-  const value = process.env[name];
+  const value = environment[name];
   if (value === undefined || value === null || String(value).trim() === '') {
     return fallback;
   }
@@ -41,15 +44,12 @@ function validateRuntimeConfig(cfg) {
   if (!isProduction) return;
 
   const requiredEnvVars = [
-    'DB_PASSWORD',
-    'REDIS_PASSWORD',
+    ...(!runtime.edge ? ['DB_PASSWORD', 'REDIS_PASSWORD', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'] : []),
     'JWT_SECRET',
-    'STRIPE_SECRET_KEY',
-    'STRIPE_WEBHOOK_SECRET'
   ];
 
   for (const key of requiredEnvVars) {
-    if (!process.env[key] || !String(process.env[key]).trim()) {
+    if (!environment[key] || !String(environment[key]).trim()) {
       throw new Error(`Missing required environment variable in production: ${key}`);
     }
   }
@@ -58,7 +58,7 @@ function validateRuntimeConfig(cfg) {
     throw new Error('JWT_SECRET must be at least 32 characters in production');
   }
 
-  if (cfg.stripe.secretKey.startsWith('sk_test_')) {
+  if (!runtime.edge && cfg.stripe.secretKey.startsWith('sk_test_')) {
     throw new Error('STRIPE_SECRET_KEY must be a live key in production');
   }
 
@@ -78,7 +78,7 @@ const config = {
     user: getEnv('DB_USER', 'nexus'),
     password: getEnv('DB_PASSWORD', isProduction ? '' : 'nexus_secret'),
     // Hosted Postgres (e.g. Supabase) requires TLS; local Docker does not.
-    ssl: getEnv('DB_SSL', 'false') === 'true' ? { rejectUnauthorized: false } : false,
+    ssl: getEnv('DB_SSL', 'false') === 'true' ? { rejectUnauthorized: true, ca: fs.readFileSync(getEnv('DB_SSL_CA_FILE', 'cloudflare/supabase-ca.crt'), 'utf8') } : false,
     max: 20,                          // Connection pool size
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: Number(getEnv('DB_CONNECT_TIMEOUT_MS', 2000)),
@@ -93,7 +93,7 @@ const config = {
   },
   
   jwt: {
-    secret: getEnv('JWT_SECRET', isProduction ? '' : 'dev_nexus_jwt_secret_please_change_me_32_chars'),
+    secret: getEnv('JWT_SECRET', isProduction ? '' : 'dev_nexora_jwt_secret_please_change_me_32_chars'),
     expiresIn: getEnv('JWT_EXPIRES_IN', '24h'),
     refreshExpiresIn: getEnv('JWT_REFRESH_EXPIRES_IN', '30d'),
   },
@@ -148,7 +148,7 @@ const idempotencyProcessingTtlSeconds = Number(getEnv('IDEMPOTENCY_PROCESSING_TT
 // ============================================================
 
 const logger = pino({
-  level: process.env.LOG_LEVEL || 'info',
+  level: environment.LOG_LEVEL || 'info',
   // Pretty output is for local development only; production logs stay structured JSON.
   ...(isProduction ? {} : {
     transport: {
@@ -158,7 +158,7 @@ const logger = pino({
   })
 });
 
-const metrics = {
+const metrics = runtime.metrics || {
   startedAtMs: Date.now(),
   requestsTotal: 0,
   requestDurationMsSum: 0,
@@ -174,30 +174,30 @@ function incrementStatusCount(statusCode) {
 
 function formatPrometheusMetrics() {
   const lines = [
-    '# HELP nexus_requests_total Total HTTP requests served by the API.',
-    '# TYPE nexus_requests_total counter',
-    `nexus_requests_total ${metrics.requestsTotal}`,
-    '# HELP nexus_request_duration_ms_sum Total request duration in milliseconds.',
-    '# TYPE nexus_request_duration_ms_sum counter',
-    `nexus_request_duration_ms_sum ${metrics.requestDurationMsSum}`,
-    '# HELP nexus_request_duration_ms_count Total number of timed requests.',
-    '# TYPE nexus_request_duration_ms_count counter',
-    `nexus_request_duration_ms_count ${metrics.requestDurationMsCount}`,
-    '# HELP nexus_auth_failures_total Total authentication failures.',
-    '# TYPE nexus_auth_failures_total counter',
-    `nexus_auth_failures_total ${metrics.authFailuresTotal}`,
-    '# HELP nexus_requests_by_status_total Requests grouped by HTTP status code.',
-    '# TYPE nexus_requests_by_status_total counter',
-    '# HELP nexus_process_uptime_seconds API process uptime in seconds.',
-    '# TYPE nexus_process_uptime_seconds gauge',
-    `nexus_process_uptime_seconds ${Math.floor(process.uptime())}`,
-    '# HELP nexus_process_resident_memory_bytes Resident set size memory in bytes.',
-    '# TYPE nexus_process_resident_memory_bytes gauge',
-    `nexus_process_resident_memory_bytes ${process.memoryUsage().rss}`
+    '# HELP nexora_requests_total Total HTTP requests served by the API.',
+    '# TYPE nexora_requests_total counter',
+    `nexora_requests_total ${metrics.requestsTotal}`,
+    '# HELP nexora_request_duration_ms_sum Total request duration in milliseconds.',
+    '# TYPE nexora_request_duration_ms_sum counter',
+    `nexora_request_duration_ms_sum ${metrics.requestDurationMsSum}`,
+    '# HELP nexora_request_duration_ms_count Total number of timed requests.',
+    '# TYPE nexora_request_duration_ms_count counter',
+    `nexora_request_duration_ms_count ${metrics.requestDurationMsCount}`,
+    '# HELP nexora_auth_failures_total Total authentication failures.',
+    '# TYPE nexora_auth_failures_total counter',
+    `nexora_auth_failures_total ${metrics.authFailuresTotal}`,
+    '# HELP nexora_requests_by_status_total Requests grouped by HTTP status code.',
+    '# TYPE nexora_requests_by_status_total counter',
+    '# HELP nexora_process_uptime_seconds API process uptime in seconds.',
+    '# TYPE nexora_process_uptime_seconds gauge',
+    `nexora_process_uptime_seconds ${Math.floor(process.uptime())}`,
+    '# HELP nexora_process_resident_memory_bytes Resident set size memory in bytes.',
+    '# TYPE nexora_process_resident_memory_bytes gauge',
+    `nexora_process_resident_memory_bytes ${process.memoryUsage().rss}`
   ];
 
   for (const [statusCode, count] of metrics.statusCounts.entries()) {
-    lines.push(`nexus_requests_by_status_total{status_code="${statusCode}"} ${count}`);
+    lines.push(`nexora_requests_by_status_total{status_code="${statusCode}"} ${count}`);
   }
 
   return `${lines.join('\n')}\n`;
@@ -248,9 +248,8 @@ const inMemoryStore = {
   kv: new Map(),
 };
 
-const db = new Pool({
+const db = runtime.db || new Pool({
   ...config.db,
-  connectionTimeoutMillis: 2000,
 });
 
 db.on('error', (err) => {
@@ -318,7 +317,7 @@ async function ensureOperationalTables() {
 // REDIS
 // ============================================================
 
-const redis = new Redis({
+const redis = runtime.redis || new Redis({
   ...config.redis,
   maxRetriesPerRequest: 1,
   enableOfflineQueue: false,
@@ -435,6 +434,7 @@ const kv = {
 
 const app = Fastify({
   logger: false,  // Using custom pino logger
+  pluginTimeout: runtime.edge ? 0 : 10000,
   trustProxy: true,
   bodyLimit: 5 * 1024 * 1024,  // 5MB
 });
@@ -465,15 +465,17 @@ app.register(require('@fastify/jwt'), {
   sign: { expiresIn: config.jwt.expiresIn }
 });
 
-app.register(require('@fastify/rate-limit'), {
+if (!runtime.edge) app.register(require('@fastify/rate-limit'), {
   global: true,
   max: 100,
   timeWindow: '1 minute',
-  redis,
+  ...(runtime.edge ? { store: runtime.rateStore } : { redis }),
   // If Redis is unreachable, serve the request rather than failing it with a 500.
-  skipOnError: true,
+  skipOnError: !runtime.edge,
   keyGenerator: (req) => req.ip
 });
+
+if (runtime.edge) app.addHook('onRequest', runtime.rateLimit);
 
 app.register(require('@fastify/multipart'));
 app.register(require('fastify-raw-body'), {
@@ -483,7 +485,7 @@ app.register(require('fastify-raw-body'), {
   runFirst: true,
 });
 
-app.register(require('@fastify/static'), {
+if (!runtime.edge) app.register(require('@fastify/static'), {
   root: path.join(__dirname, 'frontend'),
   prefix: '/',
   decorateReply: false
@@ -757,7 +759,7 @@ app.addHook('onResponse', (req, reply, done) => {
 // STRIPE
 // ============================================================
 
-const stripe = Stripe(config.stripe.secretKey);
+const stripe = Stripe(config.stripe.secretKey, runtime.edge ? { httpClient: Stripe.createFetchHttpClient() } : {});
 
 // ============================================================
 // AI ENGINE CLIENT
@@ -854,7 +856,7 @@ function localPrice(p) {
 // VALIDATION SCHEMAS
 // ============================================================
 
-const DUMMY_BCRYPT_HASH = bcrypt.hashSync('nexus-timing-equaliser', 10);
+const DUMMY_BCRYPT_HASH = '$2b$12$Au7o3hmn4SrRRKy2FTFCcelpkInFfZKgJJSUO.SjQbxu1YNwb8d06';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TRIP_STATUSES = ['requested', 'searching', 'accepted', 'driver_en_route', 'arrived', 'in_progress', 'completed', 'cancelled', 'failed'];
 const VEHICLE_TYPES = ['sedan', 'hatchback', 'suv', 'luxury', 'van', 'truck_small', 'truck_medium', 'truck_large', 'refrigerated', 'motorcycle', 'bicycle'];
@@ -865,7 +867,7 @@ const schemas = {
     phone: z.string().min(8).max(20),
     first_name: z.string().min(1).max(100),
     last_name: z.string().min(1).max(100),
-    password: z.string().min(8).max(100),
+    password: z.string().min(8).max(72).refine(value => Buffer.byteLength(value, 'utf8') <= 72, 'Password must be at most 72 bytes'),
     referral_code: z.string().optional(),
   }),
   
@@ -884,13 +886,13 @@ const schemas = {
     phone: z.string().min(8).max(20),
     first_name: z.string().min(1).max(100),
     last_name: z.string().min(1).max(100),
-    password: z.string().min(8).max(100),
+    password: z.string().min(8).max(72).refine(value => Buffer.byteLength(value, 'utf8') <= 72, 'Password must be at most 72 bytes'),
     mode: z.enum(['ride', 'freight', 'both']).default('ride'),
     vehicle: z.object({
       plate_number: z.string().min(2).max(20),
       make: z.string().min(1).max(50),
       model: z.string().min(1).max(50),
-      year: z.number().int().min(1990).max(new Date().getFullYear() + 1),
+      year: z.number().int().min(1990).refine(value => value <= new Date().getFullYear() + 1, 'Vehicle year cannot be later than next year'),
       color: z.string().min(1).max(30),
       vehicle_type: z.enum(VEHICLE_TYPES),
     }),
@@ -996,8 +998,9 @@ function validate(schema, data) {
 app.get('/health', async () => {
   return {
     status: 'ok',
-    service: 'nexus-api',
+    service: 'nexora-api',
     uptime_sec: Math.floor(process.uptime()),
+    realtime_transport: runtime.edge ? 'polling' : 'socket.io',
     timestamp: new Date().toISOString(),
   };
 });
@@ -1005,8 +1008,9 @@ app.get('/health', async () => {
 app.get('/api/v1/health', async () => {
   return {
     status: 'ok',
-    service: 'nexus-api',
+    service: 'nexora-api',
     uptime_sec: Math.floor(process.uptime()),
+    realtime_transport: runtime.edge ? 'polling' : 'socket.io',
     timestamp: new Date().toISOString(),
   };
 });
@@ -1014,7 +1018,7 @@ app.get('/api/v1/health', async () => {
 const readinessHandler = async (req, reply) => {
   const checks = {
     database: 'down',
-    redis: 'down',
+    [runtime.edge ? 'session_store' : 'redis']: 'down',
   };
 
   let ready = true;
@@ -1029,7 +1033,7 @@ const readinessHandler = async (req, reply) => {
 
   try {
     const pong = await redis.ping();
-    checks.redis = pong === 'PONG' ? 'up' : 'degraded';
+    checks[runtime.edge ? 'session_store' : 'redis'] = pong === 'PONG' ? 'up' : 'degraded';
     if (pong !== 'PONG') ready = false;
   } catch (err) {
     ready = false;
@@ -1610,7 +1614,7 @@ app.post('/api/v1/trips', { preHandler: [authenticate, requireDatabase, idempote
 
   // Match a driver in the background; the sweeper keeps retrying until the dispatch timeout.
   if (!trip.scheduled_for || new Date(trip.scheduled_for).getTime() - Date.now() < 10 * 60 * 1000) {
-    dispatchTrip(trip.id).catch((err) => logger.error({ err, tripId: trip.id }, 'Dispatch failed'));
+    await dispatchTrip(trip.id);
   }
 
   io.to(`user:${customerId}`).emit('trip:created', { trip_id: tripId, status: 'searching' });
@@ -1634,6 +1638,7 @@ app.post('/api/v1/trips', { preHandler: [authenticate, requireDatabase, idempote
 
 // Get trip details
 app.get('/api/v1/trips/:tripId', { preHandler: [authenticate, requireDatabase] }, async (req, reply) => {
+  if (runtime.edge) await sweepDispatch();
   if (!UUID_RE.test(req.params.tripId)) return reply.code(404).send({ error: 'Trip not found' });
   const { rows: [trip] } = await query(`
     SELECT t.*,
@@ -1983,7 +1988,7 @@ app.post('/api/v1/deliveries', { preHandler: [authenticate, requireDatabase, ide
     body.pickup_contact_name, body.pickup_contact_phone, body.pickup_lat, body.pickup_lng, body.pickup_address,
     body.pickup_window_start || null, body.pickup_window_end || null, pickupOtp,
     body.dropoff_contact_name, body.dropoff_contact_phone, body.dropoff_lat, body.dropoff_lng, body.dropoff_address,
-    dropoffOtp, `https://track.nexuslogistics.ai/${trackingSlug}`,
+    dropoffOtp, `${getEnv('PUBLIC_APP_URL', 'http://localhost:3000').replace(/\/$/, '')}/track/${trackingSlug}`,
     body.cargo_description, body.cargo_weight_kg, body.cargo_length_cm ?? null, body.cargo_width_cm ?? null, body.cargo_height_cm ?? null,
     body.cargo_value ?? null, body.is_fragile, body.requires_refrigeration, body.temp_min_celsius ?? null, body.temp_max_celsius ?? null,
     body.insurance_requested, insurancePremium,
@@ -1991,7 +1996,7 @@ app.post('/api/v1/deliveries', { preHandler: [authenticate, requireDatabase, ide
     totalFare, 'USD', 'pending'
   ]);
 
-  dispatchDelivery(delivery.id).catch((err) => logger.error({ err, deliveryId: delivery.id }, 'Delivery dispatch failed'));
+  await dispatchDelivery(delivery.id);
 
   logger.info({ deliveryId, customerId: req.user.id }, 'Delivery request created');
 
@@ -2100,8 +2105,8 @@ async function findTrackedDelivery(slug) {
       LEFT JOIN LATERAL (
         SELECT make, model, plate_number FROM vehicles WHERE driver_id = dr.id AND is_active ORDER BY created_at LIMIT 1
       ) v ON TRUE
-      WHERE d.tracking_url = $1
-    `, [`https://track.nexuslogistics.ai/${slug}`]);
+      WHERE d.tracking_url = $1 OR d.tracking_url LIKE $2
+    `, [`${getEnv('PUBLIC_APP_URL', 'http://localhost:3000').replace(/\/$/, '')}/track/${slug}`, `%/${slug}`]);
     return d ? { ...d, is_demo: false } : null;
   }
   return demoTrackingRecord(slug);
@@ -2134,11 +2139,14 @@ app.get('/api/v1/track/:slug', async (req, reply) => {
 });
 
 // Shareable tracking link: /track/<slug> serves the tracking page, which reads the slug from the path.
+if (!runtime.edge) {
 const trackPagePath = path.join(__dirname, 'frontend', 'track.html');
 app.get('/track/:slug', async (req, reply) => {
   const html = await fs.promises.readFile(trackPagePath);
   return reply.type('text/html; charset=utf-8').send(html);
 });
+
+}
 
 // ------------------------------------------------------------
 // Dispatch sweeper: retries unmatched jobs, expires unanswered offers.
@@ -2549,6 +2557,7 @@ app.get('/api/v1/driver/earnings', { preHandler: [authenticate, requireDatabase,
 
 // Current job(s): lets mobile clients poll instead of relying on a socket for offers.
 app.get('/api/v1/driver/jobs/current', { preHandler: [authenticate, requireDatabase, requireDriver] }, async (req, reply) => {
+  if (runtime.edge) await sweepDispatch();
   const { rows: trips } = await query(`
     SELECT id, trip_number, status, pickup_address, pickup_lat, pickup_lng, dropoff_address, dropoff_lat, dropoff_lng, total_fare, driver_assigned_at
     FROM trips WHERE driver_id = $1 AND status IN ('accepted','driver_en_route','arrived','in_progress')
@@ -2558,7 +2567,7 @@ app.get('/api/v1/driver/jobs/current', { preHandler: [authenticate, requireDatab
            cargo_description, cargo_weight_kg, total_fare
     FROM deliveries WHERE driver_id = $1 AND status IN ('pending','pickup_scheduled','in_transit','out_for_delivery')
   `, [req.driver.id]);
-  return reply.send({ trips, deliveries, respond_within_sec: driverResponseTimeoutMs / 1000 });
+  return reply.send({ trips, deliveries, driver: { status:req.driver.status, is_online:req.driver.is_online, onboarding_completed:req.driver.onboarding_completed }, respond_within_sec: driverResponseTimeoutMs / 1000 });
 });
 
 for (const action of ['accept', 'decline', 'arrive', 'start', 'complete']) {
@@ -2719,7 +2728,7 @@ app.post('/api/v1/payments/setup-intent', { preHandler: [authenticate, requireDa
       const customer = await stripe.customers.create({
         email: req.user.email,
         name: `${req.user.first_name} ${req.user.last_name}`,
-        metadata: { nexus_user_id: req.user.id }
+        metadata: { nexora_user_id: req.user.id }
       });
       customerId = customer.id;
       await query('UPDATE users SET stripe_customer_id = $1 WHERE id = $2', [customerId, req.user.id]);
@@ -2766,7 +2775,7 @@ app.register(async (instance) => {
 
     let event;
     try {
-      event = stripe.webhooks.constructEvent(
+      event = await stripe.webhooks.constructEventAsync(
         req.rawBody,
         signature,
         config.stripe.webhookSecret
@@ -2951,7 +2960,7 @@ app.get('/api/v1/ops/overview', { preHandler: opsGuard }, async (req, reply) => 
       demo: true,
       status: 'ONLINE',
       version: '3.0.0',
-      platform: 'NEXUS LOGISTICS GROUP',
+      platform: 'NEXORA LOGISTICS GROUP',
       metrics: {
         active_trips: inMemoryStore.trips.filter(t => t.status !== 'completed').length,
         active_deliveries: inMemoryStore.deliveries.filter(d => d.status !== 'delivered').length,
@@ -2991,6 +3000,7 @@ app.get('/api/v1/ops/overview', { preHandler: opsGuard }, async (req, reply) => 
         (SELECT COALESCE(SUM(platform_fee), 0) FROM trips WHERE status = 'completed' AND trip_completed_at::date = CURRENT_DATE)
           + (SELECT COALESCE(SUM(platform_fee), 0) FROM deliveries WHERE status = 'delivered' AND delivered_at::date = CURRENT_DATE) AS today_profit,
         (SELECT AVG(initial_eta_pickup_min) FROM trips WHERE created_at::date = CURRENT_DATE AND initial_eta_pickup_min IS NOT NULL) AS avg_eta,
+        (SELECT AVG(customer_rating) FROM trips WHERE customer_rating IS NOT NULL) AS avg_rating,
         (SELECT AVG(dispatch_ai_score) * 100 FROM trips WHERE created_at::date = CURRENT_DATE AND dispatch_ai_score IS NOT NULL) AS ai_score
     `),
     query(`
@@ -3017,18 +3027,20 @@ app.get('/api/v1/ops/overview', { preHandler: opsGuard }, async (req, reply) => 
   const s = stats.rows[0];
   const online = drivers.filter(d => d.is_online);
   const shipments = cold;
+  const liveAlerts = runtime.edge ? (await query("SELECT payload FROM nexora_private.events WHERE audience='ops:alerts' AND event IN ('ops:alert','cold_chain:alert') AND created_at>NOW()-INTERVAL '1 day' ORDER BY id DESC LIMIT 10")).rows.map(row => row.payload) : inMemoryStore.alerts.slice(0,10);
 
   return reply.send({
     demo: false,
     status: 'ONLINE',
     version: '3.0.0',
-    platform: 'NEXUS LOGISTICS GROUP',
+    platform: 'NEXORA LOGISTICS GROUP',
     metrics: {
       active_trips: Number(s.active_trips),
       active_deliveries: Number(s.active_deliveries),
       completed_today: Number(s.completed_today),
       today_revenue: Number(s.today_revenue),
       today_profit: Number(s.today_profit),
+      avg_rating: s.avg_rating == null ? null : Number(s.avg_rating),
       avg_eta_minutes: s.avg_eta === null ? null : Number(Number(s.avg_eta).toFixed(1)),
       dispatch_ai_score_pct: s.ai_score === null ? null : Number(Number(s.ai_score).toFixed(1)),
       deadhead_reduction_pct: null,
@@ -3048,16 +3060,31 @@ app.get('/api/v1/ops/overview', { preHandler: opsGuard }, async (req, reply) => 
     diurnal: { current_hour: currentHour, state: diurnalState(currentHour) },
     trips: trips.rows,
     deliveries: deliveries.rows,
-    alerts: inMemoryStore.alerts.slice(0, 10),
+    alerts: liveAlerts,
     timestamp: new Date().toISOString()
   });
 });
+
+if (runtime.edge) {
+  app.get('/api/v1/events', { preHandler: [authenticate, requireDatabase] }, async (req, reply) => {
+    const cursor = String(req.query.after || '0');
+    if (!/^\d{1,19}$/.test(cursor) || BigInt(cursor) > 9223372036854775807n) return reply.code(400).send({ error:'Invalid event cursor' });
+    const rooms = [`user:${req.user.id}`];
+    if (['ops', 'admin'].includes(req.user.role)) rooms.push('ops:alerts', 'ops:fleet');
+    if (req.user.role === 'driver') {
+      const { rows: [driver] } = await query('SELECT id FROM drivers WHERE user_id=$1', [req.user.id]);
+      if (driver) rooms.push(`driver:${driver.id}`);
+    }
+    const { rows } = await query(`SELECT id::text, event, payload FROM nexora_private.events WHERE id > $1::bigint AND audience = ANY($2::text[]) AND created_at > NOW() - INTERVAL '1 day' ORDER BY id LIMIT 100`, [cursor, rooms]);
+    return reply.send({ events: rows, cursor: rows.length ? rows[rows.length - 1].id : cursor });
+  });
+}
 
 // ============================================================
 // REAL-TIME WEBSOCKET (Socket.io)
 // ============================================================
 
-const io = new SocketIO({
+const io = runtime.io || new SocketIO({
   cors: {
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);
@@ -3185,7 +3212,7 @@ io.on('connection', (socket) => {
 
 // Live fleet telemetry for operations dashboards (only computed while someone is listening).
 let heartbeatInFlight = false;
-setInterval(async () => {
+if (!runtime.edge) setInterval(async () => {
   const room = io.sockets.adapter.rooms.get('ops:fleet');
   if (!room || room.size === 0 || heartbeatInFlight) return;
   heartbeatInFlight = true;
@@ -3292,14 +3319,14 @@ async function start() {
     setInterval(sweepDispatch, sweepIntervalMs).unref();
     setInterval(probeDatabase, 10000).unref();
 
-    logger.info(`🚀 NEXUS LOGISTICS API running on port ${config.port}`);
+    logger.info(`🚀 NEXORA LOGISTICS API running on port ${config.port}`);
   } catch (err) {
     logger.error({ err }, 'Failed to start server');
     process.exit(1);
   }
 }
 
-process.on('unhandledRejection', (reason) => {
+if (!runtime.edge) process.on('unhandledRejection', (reason) => {
   logger.error({ reason }, 'Unhandled promise rejection');
 });
 
@@ -3315,9 +3342,19 @@ async function shutdown(signal) {
   }
   process.exit(0);
 }
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+if (!runtime.edge) process.on('SIGTERM', () => shutdown('SIGTERM'));
+if (!runtime.edge) process.on('SIGINT', () => shutdown('SIGINT'));
 
-start();
-
-module.exports = { app, db, redis, io };
+if (!runtime.edge) start();
+return { app, db, redis, io, sweepDispatch, bootstrapAdmin,
+  async initialize() {
+    validateRuntimeConfig(config);
+    await db.query('SELECT 1');
+    dbConnected = true;
+    redisConnected = true;
+    await app.ready();
+  }
+};
+}
+module.exports = { createBackend };
+if (require.main === module) createBackend();

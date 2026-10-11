@@ -1,4 +1,4 @@
-package com.nexus.logistics;
+package com.nexora.logistics;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -31,7 +31,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Immersive dark status bar matching NEXUS brand
+        // Immersive dark status bar matching NEXORA brand
         Window window = getWindow();
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
         window.setStatusBarColor(Color.parseColor("#06080d"));
@@ -99,7 +99,7 @@ public class MainActivity extends Activity {
             @Override
             public boolean onJsAlert(WebView view, String url, String message, JsResult result) {
                 new AlertDialog.Builder(MainActivity.this)
-                        .setTitle("NEXUS Operations")
+                        .setTitle("NEXORA Operations")
                         .setMessage(message)
                         .setPositiveButton(android.R.string.ok, (dialog, which) -> result.confirm())
                         .setCancelable(false)
@@ -111,7 +111,7 @@ public class MainActivity extends Activity {
             @Override
             public boolean onJsConfirm(WebView view, String url, String message, JsResult result) {
                 new AlertDialog.Builder(MainActivity.this)
-                        .setTitle("NEXUS Operations")
+                        .setTitle("NEXORA Operations")
                         .setMessage(message)
                         .setPositiveButton(android.R.string.ok, (dialog, which) -> result.confirm())
                         .setNegativeButton(android.R.string.cancel, (dialog, which) -> result.cancel())
@@ -139,7 +139,7 @@ public class MainActivity extends Activity {
             }
         }
 
-        // Load NEXUS Operations Dashboard from bundled assets
+        // Load NEXORA Operations Dashboard from bundled assets
         webView.loadUrl("file:///android_asset/index.html");
     }
 

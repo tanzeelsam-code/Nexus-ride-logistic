@@ -1,9 +1,9 @@
-# NEXUS Logistics
+# NEXORA Logistics
 
-Two businesses on one platform, sharing one dispatch and AI backbone (**NEXUS CORE**):
+Two businesses on one platform, sharing one dispatch and AI backbone (**NEXORA CORE**):
 
-- **NEXUS RIDE** – an Uber-style taxi service: riders request trips, nearby drivers are matched and accept, the trip runs through pickup, ride and completion, fares are split 80/20 between driver and platform, and the rider rates the driver.
-- **NEXUS FREIGHT** – parcels, pallets and cold-chain cargo: shippers book a delivery, a freight-capable driver is matched, pickup and drop-off are confirmed with one-time codes, and refrigerated loads are monitored by IoT temperature telemetry.
+- **NEXORA RIDE** – an Uber-style taxi service: riders request trips, nearby drivers are matched and accept, the trip runs through pickup, ride and completion, fares are split 80/20 between driver and platform, and the rider rates the driver.
+- **NEXORA FREIGHT** – parcels, pallets and cold-chain cargo: shippers book a delivery, a freight-capable driver is matched, pickup and drop-off are confirmed with one-time codes, and refrigerated loads are monitored by IoT temperature telemetry.
 
 Drivers can serve rides, freight, or both (`ride` / `freight` / `both` mode).
 
@@ -11,25 +11,37 @@ Drivers can serve rides, freight, or both (`ride` / `freight` / `both` mode).
 
 | Part | Path | Notes |
 |---|---|---|
-| REST + Socket.io API | `backend_api.js` | Fastify, PostgreSQL/PostGIS/TimescaleDB, Redis |
+| REST API | `backend_api.js`, `cloudflare/` | Cloudflare Workers + Supabase PostgreSQL/PostGIS |
 | Database schema | `database_schema.sql` | Loaded automatically by the Postgres container |
 | AI engine | `ai_engine.py` | FastAPI + PyTorch: dispatch ranking, pricing, ETA, fraud, safety, demand, cold chain |
-| Ops dashboards | `frontend/` | Static HTML + `nexus-client.js` (live data bridge, ops sign-in) |
+| Ops dashboards | `frontend/` | Static HTML + `nexora-client.js` (live data bridge, ops sign-in) |
 | Android shell | `android/`, `scripts/build-apk.sh` | WebView wrapper around the dashboards |
-| Edge preview | `cloudflare/worker.mjs` | Serves the dashboards as a labelled demo (no backend) |
+| Cloudflare app | `cloudflare/worker.mjs` | Website, live API, authorized event polling and scheduled dispatch |
 | Infra | `docker-compose.yml`, `nginx.conf`, `monitoring/` | Postgres, Redis, API, AI, Nginx, Prometheus, Grafana |
 | Tests | `scripts/e2e.js`, `scripts/verify-all.sh` | See [Testing](#testing) |
 
+## Live deployment: Supabase + Cloudflare
+
+The live app is https://nexora-ride-logistic.tanzeelsam.workers.dev. Cloudflare serves the frontend and runs the existing Fastify API through its Node HTTP adapter. Supabase stores application data, sessions, refresh tokens, request locks, rate limits and the event outbox. No Redis, Containers or separate backend server is required for this deployment.
+
+Cloudflare Hyperdrive `DATABASE` connects to Supabase project `ftghshvmcjxkshoenpmn` with a dedicated `nexora_backend` login. The origin uses `verify-full` TLS and the Supabase root CA; query caching is disabled for current driver and booking state. The login has application table access with RLS policies, and cannot create roles or bypass RLS. Browser roles cannot read the private runtime schema. Cloudflare secrets hold the JWT signing and optional integration keys; credentials must stay out of Git.
+
+Passwords use bcrypt with cost 12 through Supabase pgcrypto. Browser sessions retain the existing API token format. Live notifications use authenticated `GET /api/v1/events?after=<cursor>` polling; customer and driver events are restricted to their own identities, and operations events require an operations role. Dispatch runs on a one-minute Cloudflare cron and during job polling. The standalone Node runtime still supports Socket.io and Redis for local development.
+
+Deploy with `npm run deploy`. This installation can preview the Worker with `npm run preview:cloudflare`; `.env.cloudflare-local` configures the local Hyperdrive connection with certificate verification. Open `http://localhost:8787/?api=http://localhost:8787`. Verify `GET /api/v1/ready` reports `database` and `session_store` as `up`. The ignored `.env.nexora-admin` file holds this installation's operations login. Payment capture still requires valid Stripe credentials; pricing and cash booking flows run without a separate AI service. Worker Prometheus counters are scoped to an isolate; Cloudflare observability is the source for aggregate traffic.
+
+Run the existing end-to-end suite against a Worker with `E2E_WORKER=true E2E_BASE_URL=<app URL>` and the installation's `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `IOT_DEVICE_KEY`, and `STRIPE_WEBHOOK_SECRET`. This mode checks HTTP events instead of Socket.io and does not reset other users' records. Tests create users with `@nexora.test` addresses; use only a designated test workflow.
+
 ## Quick start (local development)
 
-You need Node 20+, PostgreSQL with PostGIS and TimescaleDB, and Redis. The easiest way to get the databases is Docker:
+You need Node 22+, PostgreSQL with PostGIS and TimescaleDB, and Redis. The easiest way to get the databases is Docker:
 
 ```bash
-docker run -d --name nexus-pg -p 5432:5432 \
+docker run -d --name nexora-pg -p 5432:5432 \
   -e POSTGRES_USER=nexus -e POSTGRES_PASSWORD=nexus_secret -e POSTGRES_DB=nexusdb \
   -v "$PWD/database_schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro" \
   timescale/timescaledb-ha:pg15-latest
-docker run -d --name nexus-redis -p 6379:6379 redis:7-alpine redis-server --requirepass redis_secret
+docker run -d --name nexora-redis -p 6379:6379 redis:7-alpine redis-server --requirepass redis_secret
 
 npm install
 ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='choose-a-long-password' npm start
@@ -112,6 +124,16 @@ These are not built yet; do not rely on them in production:
 
 - **Card charging.** Cash trips settle; card trips record a pending payment but nothing captures it. `setup-intent` and the Stripe webhook are in place, but there is no payment-method storage or charge-on-completion step, and no driver payout job.
 - **The AI models are untrained.** `DispatchBrainNet`, `ETAProphetNet` and `DemandOracleNet` run with random weights, so their scores, ETAs and forecasts are placeholders. Dispatch effectively relies on proximity; pricing uses the rate card plus a heuristic surge.
-- **No rider or driver apps.** The repo has the API and the ops dashboards. `ride.html` and `freight.html`, and the revenue chart, top-drivers list and AI panels on `index.html`, still show static sample content. The Android APK wraps those dashboards.
+- **Web portals are available; native apps are not.** Customers can book rides at `customer.html`, drivers can register and manage jobs at `driver.html`, and administrators can approve drivers at `admin.html`. `ride.html` and `freight.html`, and some charts and AI panels on `ops.html`, still show static sample content. The Android APK is a WebView wrapper.
 - **Routing and ETA** use straight-line distance × 1.3, not a maps provider.
 - No push/SMS notifications, promo codes, driver document uploads, or TLS termination.
+
+### Customer, driver, and administrator access
+
+Start at https://nexora-ride-logistic.tanzeelsam.workers.dev/ and choose a role.
+
+- **Customer:** Open `/customer.html`, expand **Create a customer account**, register, and request a ride. Enter pickup/destination addresses and coordinates; address search is not yet implemented. The pickup location button can fill the pickup coordinates with permission. Current bookings use cash. Follow ride status and share the pickup PIN only when the driver arrives.
+- **Driver:** Register at `/driver-register.html`, including your vehicle. Sign in at `/driver.html`. An administrator must approve your registration before **Go online** works. Allow location access so dispatch can find you near a pickup. Accept an offer, mark arrival, enter the rider's pickup PIN, and complete the ride. Delivery jobs also support pickup/drop-off PINs and proof of delivery.
+- **Admin:** Sign in at `/admin.html` with the local credentials in `.env.nexora-admin`. Review pending drivers and choose **Approve driver**. Open the operations dashboard at `/ops.html` for fleet and dispatch information. Public registration creates customer or driver accounts, never admin accounts.
+
+To try all roles yourself, use separate browser profiles or tabs and different customer/driver email addresses and phone numbers. Register the driver, approve them as admin, and put them online near your customer pickup before requesting a ride. With no nearby available driver, the request fails after the dispatch timeout.

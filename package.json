@@ -1,7 +1,7 @@
 {
-  "name": "nexus-api",
+  "name": "nexora-api",
   "version": "1.0.0",
-  "description": "NEXUS Logistics Backend API",
+  "description": "NEXORA Logistics Backend API",
   "main": "backend_api.js",
   "scripts": {
     "start": "node backend_api.js",
@@ -9,21 +9,21 @@
     "verify": "bash scripts/verify-all.sh",
     "deploy": "wrangler deploy",
     "deploy:check": "wrangler deploy --dry-run",
-    "preview:cloudflare": "wrangler dev",
+    "preview:cloudflare": "node --env-file=.env.cloudflare-local node_modules/wrangler/bin/wrangler.js dev",
     "build:apk": "bash scripts/build-apk.sh",
-    "install:apk": "adb install -r dist/nexus-logistics.apk",
-    "launch:apk": "adb shell am start -n com.nexus.logistics/.MainActivity",
+    "install:apk": "adb install -r dist/nexora-logistics.apk",
+    "launch:apk": "adb shell am start -n com.nexora.logistics/.MainActivity",
     "test": "node scripts/e2e.js",
     "test:e2e": "node scripts/e2e.js"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",
-    "@fastify/jwt": "^9.1.0",
+    "@fastify/jwt": "10.2.3",
     "@fastify/multipart": "^9.2.1",
     "@fastify/rate-limit": "^10.3.0",
     "@fastify/static": "^10.1.5",
     "axios": "^1.6.0",
-    "bcrypt": "^5.1.0",
+    "bcryptjs": "3.0.3",
     "fastify": "^5.2.1",
     "fastify-raw-body": "^6.0.1",
     "ioredis": "^5.3.2",
@@ -38,5 +38,9 @@
   "devDependencies": {
     "socket.io-client": "^4.8.4",
     "wrangler": "^4.147.0"
+  },
+  "overrides": {
+    "find-my-way": "9.9.0",
+    "avvio": "9.3.0"
   }
 }

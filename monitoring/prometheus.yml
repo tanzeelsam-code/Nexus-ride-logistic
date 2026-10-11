@@ -7,7 +7,7 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:9090']
 
-  - job_name: nexus_api
+  - job_name: nexora_api
     metrics_path: /metrics
     static_configs:
       - targets: ['api:3000']

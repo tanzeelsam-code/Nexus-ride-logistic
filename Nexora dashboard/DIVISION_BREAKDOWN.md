@@ -1,15 +1,15 @@
-# NEXUS LOGISTICS GROUP
+# NEXORA LOGISTICS GROUP
 ## Two-Division Architecture: RIDE vs FREIGHT
 
 ---
 
 ## ✅ CONFIRMATION: YES, BOTH DIVISIONS ARE FULLY INCLUDED
 
-The platform has **two completely separate, independent divisions** sharing one AI backbone (NEXUS CORE).
+The platform has **two completely separate, independent divisions** sharing one AI backbone (NEXORA CORE).
 
 ---
 
-## 🚕 DIVISION 1: NEXUS RIDE (Taxi Service)
+## 🚕 DIVISION 1: NEXORA RIDE (Taxi Service)
 
 ### What It Does
 Passenger transportation — people moving from point A to B.
@@ -26,7 +26,7 @@ Passenger transportation — people moving from point A to B.
 
 ### Customer Journey (Taxi)
 ```
-1. Customer opens NEXUS RIDE app
+1. Customer opens NEXORA RIDE app
 2. Enters pickup & dropoff location
 3. AI PricingEngine calculates fare + surge
 4. Customer confirms & pays
@@ -60,13 +60,13 @@ Passenger transportation — people moving from point A to B.
 - ETA Prophet → "Your driver arrives in 4 min"
 - PricingEngine → Dynamic surge pricing
 - SafetyShield → Route deviation, harsh braking detection
-- NexusChat → Support: "My driver took wrong route"
+- NexoraChat → Support: "My driver took wrong route"
 
 ### Dashboard Color: Electric Cyan (#00D4FF)
 
 ---
 
-## 📦 DIVISION 2: NEXUS FREIGHT (Goods / Logistics)
+## 📦 DIVISION 2: NEXORA FREIGHT (Goods / Logistics)
 
 ### What It Does
 Moving goods, cargo, and packages — things (not people) from A to B.
@@ -128,7 +128,7 @@ Special Workflow:
 - ETA Prophet → "Package arrives between 2pm–4pm"
 - DemandOracle → Predict when cold chain vehicles will be needed
 - SafetyShield → Cargo seal tampering, route deviation
-- NexusChat → Support: "My package temperature alert triggered"
+- NexoraChat → Support: "My package temperature alert triggered"
 
 ### Corporate B2B Features (Freight Only)
 - Dedicated corporate dashboard
@@ -147,9 +147,9 @@ Special Workflow:
 
 ```
 ┌────────────────────────────────────────────────────────────┐
-│                    NEXUS LOGISTICS GROUP                    │
+│                    NEXORA LOGISTICS GROUP                    │
 ├─────────────────────────┬──────────────────────────────────┤
-│     NEXUS RIDE          │        NEXUS FREIGHT              │
+│     NEXORA RIDE          │        NEXORA FREIGHT              │
 │     (Taxi)              │        (Logistics)                │
 │  ● Standard Ride        │  ● Courier                        │
 │  ● Premium              │  ● Standard Parcel                │
@@ -158,10 +158,10 @@ Special Workflow:
 │  ● Medical              │  ● Oversized Cargo                │
 │  ● Airport              │  ● Express Same-Day               │
 ├─────────────────────────┴──────────────────────────────────┤
-│                    NEXUS CORE AI                            │
+│                    NEXORA CORE AI                            │
 │  DispatchBrain · ETA Prophet · PricingEngine               │
 │  SafetyShield · FraudSentinel · DemandOracle               │
-│  LoadOptimizer · NexusChat · RouteIntelligence             │
+│  LoadOptimizer · NexoraChat · RouteIntelligence             │
 ├────────────────────────────────────────────────────────────┤
 │              SHARED INFRASTRUCTURE                          │
 │  PostgreSQL + TimescaleDB · Redis · Kafka · Socket.io      │
@@ -197,7 +197,7 @@ Special Workflow:
 
 ## 📱 SEPARATE CUSTOMER-FACING APPS
 
-### NEXUS RIDE App (Customer)
+### NEXORA RIDE App (Customer)
 - Book taxi in 3 taps
 - Real-time driver tracking on map
 - Fare estimator with surge indicator
@@ -205,7 +205,7 @@ Special Workflow:
 - Schedule future rides
 - Ride history & receipts
 
-### NEXUS FREIGHT App / Portal (Business)
+### NEXORA FREIGHT App / Portal (Business)
 - Create delivery order with cargo details
 - Upload cargo photos
 - Insurance add-on option
@@ -214,7 +214,7 @@ Special Workflow:
 - Corporate account billing
 - API for e-commerce integration (Shopify, WooCommerce)
 
-### NEXUS DRIVER App (Combined)
+### NEXORA DRIVER App (Combined)
 - Drivers can toggle: "I'm available for Rides / Freight / Both"
 - Different UI modes based on active service type
 - Ride mode: navigation to pickup + dropoff
@@ -224,7 +224,7 @@ Special Workflow:
 
 ## 💰 REVENUE COMPARISON
 
-| Metric | NEXUS RIDE | NEXUS FREIGHT |
+| Metric | NEXORA RIDE | NEXORA FREIGHT |
 |--------|-----------|---------------|
 | Avg fare per transaction | $18–45 | $65–520 |
 | Platform commission | 18–22% | 15–20% |
@@ -238,4 +238,4 @@ Special Workflow:
 ---
 
 *Both divisions. One AI brain. Zero compromise.*
-*NEXUS LOGISTICS GROUP*
+*NEXORA LOGISTICS GROUP*

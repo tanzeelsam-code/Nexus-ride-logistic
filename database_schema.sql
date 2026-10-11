@@ -1,5 +1,5 @@
 -- ============================================================
--- NEXUS LOGISTICS — COMPLETE DATABASE SCHEMA
+-- NEXORA LOGISTICS — COMPLETE DATABASE SCHEMA
 -- PostgreSQL 15 + TimescaleDB Extension
 -- ============================================================
 

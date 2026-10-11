@@ -1,5 +1,5 @@
 """
-NEXUS LOGISTICS — NEXUS CORE AI ENGINE
+NEXORA LOGISTICS — NEXORA CORE AI ENGINE
 =======================================
 Multi-model AI system for intelligent transportation operations.
 Handles: Dispatch, Routing, Pricing, ETA, Safety, Fraud, Forecasting
@@ -32,7 +32,7 @@ from redis import asyncio as aioredis
 import httpx
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(name)s] %(levelname)s: %(message)s')
-logger = logging.getLogger("NEXUS-CORE")
+logger = logging.getLogger("NEXORA-CORE")
 
 # ============================================================
 # CONFIGURATION
@@ -343,9 +343,9 @@ class DemandOracleNet(nn.Module):
 # AI ENGINE — CORE CLASS
 # ============================================================
 
-class NexusCore:
+class NexoraCore:
     """
-    Central AI brain. Orchestrates all AI decisions for NEXUS LOGISTICS.
+    Central AI brain. Orchestrates all AI decisions for NEXORA LOGISTICS.
     """
     
     def __init__(self):
@@ -361,7 +361,7 @@ class NexusCore:
         self.eta_model.eval()
         self.demand_model.eval()
         
-        logger.info("NEXUS CORE initialized with all AI models")
+        logger.info("NEXORA CORE initialized with all AI models")
     
     async def initialize(self):
         """Connect to infrastructure services"""
@@ -369,7 +369,7 @@ class NexusCore:
             client = aioredis.from_url(Config.REDIS_URL, decode_responses=True)
             await client.ping()
             self.redis = client
-            logger.info("NEXUS CORE connected to Redis")
+            logger.info("NEXORA CORE connected to Redis")
         except Exception as exc:
             # Surge/fraud/safety caches are optional; run without them rather than crash.
             self.redis = None
@@ -968,7 +968,7 @@ class NexusCore:
         }
     
     # ----------------------------------------------------------
-    # MODULE 7: NEXUS CHAT (AI Customer Support)
+    # MODULE 7: NEXORA CHAT (AI Customer Support)
     # ----------------------------------------------------------
     
     async def handle_support_query(self, query: str, context: Dict) -> str:
@@ -977,7 +977,7 @@ class NexusCore:
         Handles: trip issues, billing disputes, driver complaints,
                  ETA queries, cancellation requests.
         """
-        system_prompt = """You are NEXUS, an AI customer support agent for NEXUS LOGISTICS.
+        system_prompt = """You are NEXORA, an AI customer support agent for NEXORA LOGISTICS.
 You help with:
 - Ride and delivery status
 - Billing and payment issues  
@@ -1023,10 +1023,10 @@ Issue Type: {context.get('issue_type', 'general')}
                 data = response.json()
                 return data['content'][0]['text']
         except Exception as e:
-            logger.error(f"NexusChat error: {e}")
+            logger.error(f"NexoraChat error: {e}")
             return ("I apologize, I'm having trouble processing your request right now. "
-                   "Please contact our support team directly at support@nexuslogistics.ai "
-                   "or call +1-800-NEXUS-GO.")
+                   "Please contact our support team directly at support@nexoralogistics.ai "
+                   "or call +1-800-NEXORA-GO.")
     
     # ----------------------------------------------------------
     # MODULE 8: LOAD OPTIMIZER (Freight)
@@ -1103,8 +1103,8 @@ Issue Type: {context.get('issue_type', 'general')}
 # ============================================================
 
 app = FastAPI(
-    title="NEXUS CORE — AI Engine",
-    description="Central AI decision engine for NEXUS LOGISTICS",
+    title="NEXORA CORE — AI Engine",
+    description="Central AI decision engine for NEXORA LOGISTICS",
     version="3.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
@@ -1112,13 +1112,13 @@ app = FastAPI(
 
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-nexus_core = NexusCore()
+nexora_core = NexoraCore()
 
 
 @app.on_event("startup")
 async def startup():
-    await nexus_core.initialize()
-    logger.info("🚀 NEXUS CORE API started")
+    await nexora_core.initialize()
+    logger.info("🚀 NEXORA CORE API started")
 
 
 # -- Request/Response Models --
@@ -1183,7 +1183,7 @@ class FraudCheckRequest(BaseModel):
 async def health():
     return {
         "status": "healthy",
-        "service": "NEXUS CORE AI",
+        "service": "NEXORA CORE AI",
         "version": "3.0.0",
         "models": {
             "dispatch_brain": "loaded",
@@ -1230,7 +1230,7 @@ async def dispatch_driver(req: DispatchRequest, background_tasks: BackgroundTask
         # Never fabricate drivers: the caller must supply real candidates.
         raise HTTPException(status_code=503, detail="No available drivers in your area")
 
-    decision = await nexus_core.dispatch(request, candidate_drivers)
+    decision = await nexora_core.dispatch(request, candidate_drivers)
     
     if not decision:
         raise HTTPException(status_code=503, detail="No available drivers in your area")
@@ -1268,7 +1268,7 @@ async def estimate_price(req: PriceRequest):
         "freight_per_km": 2.00, "freight_per_kg": 0.05, "freight_per_m3": 2.00
     }
     
-    pricing = await nexus_core.calculate_price(request, zone)
+    pricing = await nexora_core.calculate_price(request, zone)
     
     return {
         "breakdown": {
@@ -1288,13 +1288,13 @@ async def estimate_price(req: PriceRequest):
 @app.post("/safety/analyze")
 async def analyze_safety(req: SafetyCheckRequest):
     """Analyze real-time trip safety telemetry"""
-    result = await nexus_core.analyze_trip_safety(req.trip_id, req.dict())
+    result = await nexora_core.analyze_trip_safety(req.trip_id, req.dict())
     return result
 
 
 @app.post("/support/chat")
 async def support_chat(req: SupportRequest):
-    """NexusChat AI customer support"""
+    """NexoraChat AI customer support"""
     context = {
         "customer_name": req.customer_name,
         "tier": req.tier,
@@ -1302,11 +1302,11 @@ async def support_chat(req: SupportRequest):
         "recent_trips_count": req.recent_trips_count,
         "issue_type": req.issue_type
     }
-    response = await nexus_core.handle_support_query(req.query, context)
+    response = await nexora_core.handle_support_query(req.query, context)
     return {
         "response": response,
-        "responded_by": "NEXUS AI",
-        "escalation_required": "support@nexuslogistics.ai" in response,
+        "responded_by": "NEXORA AI",
+        "escalation_required": "support@nexoralogistics.ai" in response,
         "timestamp": datetime.utcnow().isoformat()
     }
 
@@ -1314,21 +1314,21 @@ async def support_chat(req: SupportRequest):
 @app.post("/fraud/check")
 async def fraud_check(req: FraudCheckRequest):
     """Real-time fraud detection for payment"""
-    result = await nexus_core.check_fraud(req.dict())
+    result = await nexora_core.check_fraud(req.dict())
     return result
 
 
 @app.post("/demand/forecast")
 async def demand_forecast(zone_ids: List[int] = [0,1,2,3,4]):
     """Forecast demand across zones"""
-    result = await nexus_core.forecast_demand(zone_ids)
+    result = await nexora_core.forecast_demand(zone_ids)
     return result
 
 
 @app.post("/freight/optimize-load")
 async def optimize_load(vehicle: Dict, packages: List[Dict]):
     """Optimize freight loading configuration"""
-    result = nexus_core.optimize_freight_load(vehicle, packages)
+    result = nexora_core.optimize_freight_load(vehicle, packages)
     return result
 
 
@@ -1336,7 +1336,7 @@ async def optimize_load(vehicle: Dict, packages: List[Dict]):
 async def get_surge(lat: float, lng: float, service_type: str = "taxi"):
     """Get current surge multiplier for a location"""
     location = Location(lat, lng)
-    surge = await nexus_core.get_surge_multiplier(location, ServiceType(service_type))
+    surge = await nexora_core.get_surge_multiplier(location, ServiceType(service_type))
     return {
         "surge_multiplier": surge,
         "is_surge_active": surge > 1.0,

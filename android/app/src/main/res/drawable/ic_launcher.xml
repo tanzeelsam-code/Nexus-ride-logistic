@@ -12,7 +12,7 @@
         android:strokeColor="#00d4ff"
         android:strokeWidth="3"
         android:pathData="M54,18 A36,36 0 1,1 53.9,18 Z" />
-    <!-- Electric Lightning / NEXUS Core glyph -->
+    <!-- Electric Lightning / NEXORA Core glyph -->
     <path
         android:fillColor="#00d4ff"
         android:pathData="M56,26 L38,52 L52,52 L48,82 L70,48 L56,48 Z" />

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>NEXUS Driver Co-Pilot & e-POD Terminal</title>
+  <title>NEXORA Driver Co-Pilot & e-POD Terminal</title>
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -320,7 +320,7 @@
   <div class="mobile-frame">
     <!-- Sign in -->
     <div class="job-card" id="login-view" style="display:none;">
-      <h3 style="font-size:16px;font-weight:700;">Driver sign in</h3>
+      <h3 style="font-size:16px;font-weight:700;">Driver sign in</h3><p><a href="driver-register.html" style="color:#61dbef">Create a driver account</a> · <a href="/" style="color:#61dbef">Choose another role</a></p>
       <form id="login-form" onsubmit="login(event)">
         <div class="input-group">
           <label for="login-email">Email</label>
@@ -366,7 +366,7 @@
         </div>
       </div>
 
-      <div class="jobs" id="jobs"></div>
+      <div class="job-card"><strong>Your dispatch location</strong><p>Going online uses your device location. If location permission is unavailable, enter coordinates below.</p><div class="input-group"><label for="location-lat">Latitude</label><input id="location-lat" type="number" min="-90" max="90" step="any"></div><div class="input-group"><label for="location-lng">Longitude</label><input id="location-lng" type="number" min="-180" max="180" step="any"></div><button type="button" class="btn-action" id="update-location">Update location</button><p id="location-message" role="status"></p></div><div class="jobs" id="jobs"></div>
     </div>
   </div>
 
@@ -404,8 +404,8 @@
   </div>
 
   <script>
-    const TOKEN_KEY = 'nexus_driver_token';
-    const NAME_KEY = 'nexus_driver_name';
+    const TOKEN_KEY = 'nexora_driver_token';
+    const NAME_KEY = 'nexora_driver_name';
     const $ = (id) => document.getElementById(id);
     const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const money = (v) => `$${Number(v || 0).toFixed(2)}`;
@@ -415,6 +415,9 @@
     };
 
     let jobsTimer = null;
+    let locationTimer = null;
+    let locationBusy = false;
+    let manualLocation = false;
     let online = false;
     let podDeliveryId = null;
     let signed = false;
@@ -426,7 +429,7 @@
       const res = await fetch(`/api/v1${path}`, { ...options, headers });
       let body = null;
       try { body = await res.json(); } catch { /* empty body */ }
-      if (res.status === 401 && path !== '/auth/login') { logout(); throw new Error('Session expired. Sign in again.'); }
+      if (res.status === 401 && path !== '/auth/login') { logout(true); throw new Error('Session expired. Sign in again.'); }
       if (res.status === 503) { showView('offline'); throw new Error(body?.error || 'Service unavailable'); }
       if (!res.ok) throw new Error(body?.error || `Request failed (${res.status})`);
       return body;
@@ -457,7 +460,12 @@
       }
     }
 
-    function logout() {
+    async function logout(expired = false) {
+      if (online && !expired) {
+        try { await api('/driver/status', { method:'POST',body:JSON.stringify({status:'offline'}) }); }
+        catch(err) { $('status-error').textContent = err.message; return; }
+      }
+      clearInterval(jobsTimer); clearInterval(locationTimer); online = false;
       const token = store.get(TOKEN_KEY);
       if (token) fetch('/api/v1/auth/logout', { method: 'POST', headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
       store.set(TOKEN_KEY, null);
@@ -474,13 +482,44 @@
     async function toggleOnline() {
       $('status-error').textContent = '';
       try {
+        if (!online) await updateLocation();
         const data = await api('/driver/status', { method: 'POST', body: JSON.stringify({ status: online ? 'offline' : 'available' }) });
         online = data.status !== 'offline';
         renderOnline();
+        syncLocationTimer();
       } catch (err) {
         $('status-error').textContent = err.message;
       }
     }
+
+    async function updateLocation() {
+      if (locationBusy) return;
+      locationBusy = true;
+      try {
+        let position;
+        const latValue = $('location-lat').value, lngValue = $('location-lng').value;
+        if (manualLocation && latValue !== '' && lngValue !== '') {
+          position = { lat:Number(latValue), lng:Number(lngValue) };
+        } else {
+          if (!navigator.geolocation) throw new Error('Location is unavailable. Enter latitude and longitude, then choose Update location.');
+          const current = await new Promise((resolve,reject) => navigator.geolocation.getCurrentPosition(resolve,()=>reject(new Error('Allow location access, or enter latitude and longitude and choose Update location.')),{ enableHighAccuracy:true,timeout:15000,maximumAge:10000 }));
+          position = { lat:current.coords.latitude, lng:current.coords.longitude, accuracy_m:Math.min(32000,Math.round(current.coords.accuracy)) };
+          $('location-lat').value = position.lat; $('location-lng').value = position.lng;
+        }
+        if (!Number.isFinite(position.lat) || !Number.isFinite(position.lng) || Math.abs(position.lat)>90 || Math.abs(position.lng)>180) throw new Error('Enter valid latitude and longitude.');
+        await api('/driver/location',{method:'POST',body:JSON.stringify(position)});
+        $('location-message').textContent = 'Location updated at '+new Date().toLocaleTimeString();
+      } finally { locationBusy = false; }
+    }
+    function syncLocationTimer() {
+      clearInterval(locationTimer);
+      if (online) locationTimer = setInterval(()=>updateLocation().catch(err=>{ $('location-message').textContent=err.message; }),15000);
+    }
+    $('update-location').addEventListener('click',async()=>{
+      manualLocation = $('location-lat').value !== '' && $('location-lng').value !== '';
+      try { await updateLocation(); } catch(err) { $('location-message').textContent=err.message; }
+    });
+    $('online-btn').addEventListener('keydown',event=>{if(event.key==='Enter' || event.key===' '){event.preventDefault();toggleOnline();}});
 
     async function loadEarnings() {
       try {
@@ -530,7 +569,8 @@
 
     async function loadJobs() {
       try {
-        const { trips, deliveries } = await api('/driver/jobs/current');
+        const { trips, deliveries, driver } = await api('/driver/jobs/current');
+        if (driver) { const changed = online !== driver.is_online; online = driver.is_online; renderOnline(); if(changed)syncLocationTimer(); if(!driver.onboarding_completed)$('status-error').textContent='Your account is waiting for admin approval.'; }
         const cards = [...trips.map((t) => jobCard('trip', t)), ...deliveries.map((d) => jobCard('delivery', d))];
         $('jobs').innerHTML = cards.length ? cards.join('') : '<div class="job-card notice"><strong>No active jobs</strong>Go online to receive ride and delivery offers.</div>';
       } catch (err) {

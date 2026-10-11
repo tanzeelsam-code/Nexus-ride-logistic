@@ -1,5 +1,5 @@
 /**
- * NEXUS LOGISTICS — Real-Time Operations Bridge & Live HUD
+ * NEXORA LOGISTICS — Real-Time Operations Bridge & Live HUD
  * =========================================================
  * Connects frontend dashboards (index.html, ride.html, freight.html)
  * to Fastify REST API, Socket.io real-time stream, and AI CORE.
@@ -34,15 +34,15 @@
   };
 
   // Shared with the dashboard page: it renders live data when `live` is true, sample data otherwise.
-  window.NexusLive = { live: false, overview: null };
+  window.NexoraLive = { live: false, overview: null };
   function publishLive(data) {
-    window.NexusLive.live = !!data && !data.demo;
-    window.NexusLive.overview = data || null;
-    window.dispatchEvent(new CustomEvent('nexus:data'));
+    window.NexoraLive.live = !!data && !data.demo;
+    window.NexoraLive.overview = data || null;
+    window.dispatchEvent(new CustomEvent('nexora:data'));
   }
 
   // Ops sign-in: the ops endpoints and socket require an ops/admin token.
-  const TOKEN_KEY = 'nexus_ops_token';
+  const TOKEN_KEY = 'nexora_ops_token';
   function getToken() {
     try { return sessionStorage.getItem(TOKEN_KEY); } catch { return null; }
   }
@@ -60,8 +60,8 @@
   // ─── STYLES INJECTION ──────────────────────────────────────────────
   const hudStyles = document.createElement('style');
   hudStyles.textContent = `
-    /* NEXUS OPERATIONS LIVE HUD */
-    #nexus-hud-bar {
+    /* NEXORA OPERATIONS LIVE HUD */
+    #nexora-hud-bar {
       position: fixed;
       top: 0;
       left: 0;
@@ -168,7 +168,7 @@
     }
 
     /* TOAST ALERTS */
-    #nexus-toast-container {
+    #nexora-toast-container {
       position: fixed;
       bottom: 24px;
       right: 24px;
@@ -178,7 +178,7 @@
       gap: 10px;
       max-width: 380px;
     }
-    .nexus-toast {
+    .nexora-toast {
       background: rgba(15, 23, 42, 0.95);
       backdrop-filter: blur(12px);
       border-radius: 8px;
@@ -188,35 +188,35 @@
       align-items: flex-start;
       border-left: 4px solid #00d4ff;
       box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6);
-      animation: nexusSlideIn 0.25s ease-out;
+      animation: nexoraSlideIn 0.25s ease-out;
       color: #e2e8f0;
       font-family: 'Barlow', sans-serif;
     }
-    .nexus-toast.critical {
+    .nexora-toast.critical {
       border-left-color: #ef4444;
       background: rgba(35, 12, 16, 0.95);
     }
-    .nexus-toast.warning {
+    .nexora-toast.warning {
       border-left-color: #f59e0b;
       background: rgba(35, 24, 12, 0.95);
     }
-    .nexus-toast.success {
+    .nexora-toast.success {
       border-left-color: #10b981;
     }
-    .nexus-toast-title {
+    .nexora-toast-title {
       font-weight: 700;
       font-size: 13px;
       color: #f8fafc;
       margin-bottom: 2px;
     }
-    .nexus-toast-desc {
+    .nexora-toast-desc {
       font-size: 11px;
       color: #94a3b8;
       line-height: 1.4;
     }
 
     /* MODAL STYLES */
-    .nexus-modal-backdrop {
+    .nexora-modal-backdrop {
       position: fixed;
       top: 0;
       left: 0;
@@ -229,7 +229,7 @@
       align-items: center;
       justify-content: center;
     }
-    .nexus-modal {
+    .nexora-modal {
       background: #0d121c;
       border: 1px solid rgba(0, 212, 255, 0.25);
       border-radius: 12px;
@@ -240,7 +240,7 @@
       box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 212, 255, 0.15);
       font-family: 'Barlow', sans-serif;
     }
-    .nexus-modal-header {
+    .nexora-modal-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -248,7 +248,7 @@
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
       padding-bottom: 12px;
     }
-    .nexus-modal-title {
+    .nexora-modal-title {
       font-size: 16px;
       font-weight: 700;
       color: #f8fafc;
@@ -256,24 +256,24 @@
       align-items: center;
       gap: 8px;
     }
-    .nexus-modal-close {
+    .nexora-modal-close {
       background: transparent;
       border: none;
       color: #94a3b8;
       font-size: 18px;
       cursor: pointer;
     }
-    .nexus-form-group {
+    .nexora-form-group {
       margin-bottom: 14px;
     }
-    .nexus-form-label {
+    .nexora-form-label {
       display: block;
       font-size: 11px;
       color: #94a3b8;
       margin-bottom: 6px;
       font-family: 'Barlow Mono', monospace;
     }
-    .nexus-form-input, .nexus-form-select {
+    .nexora-form-input, .nexora-form-select {
       width: 100%;
       background: #151d2d;
       border: 1px solid rgba(255, 255, 255, 0.12);
@@ -284,10 +284,10 @@
       box-sizing: border-box;
       outline: none;
     }
-    .nexus-form-input:focus, .nexus-form-select:focus {
+    .nexora-form-input:focus, .nexora-form-select:focus {
       border-color: #00d4ff;
     }
-    .nexus-modal-footer {
+    .nexora-modal-footer {
       display: flex;
       justify-content: flex-end;
       gap: 10px;
@@ -295,7 +295,7 @@
       padding-top: 14px;
       border-top: 1px solid rgba(255, 255, 255, 0.08);
     }
-    @keyframes nexusSlideIn {
+    @keyframes nexoraSlideIn {
       from { transform: translateX(100%); opacity: 0; }
       to { transform: translateX(0); opacity: 1; }
     }
@@ -304,15 +304,15 @@
 
   // ─── HUD DOM CREATION ──────────────────────────────────────────────
   const hud = document.createElement('div');
-  hud.id = 'nexus-hud-bar';
+  hud.id = 'nexora-hud-bar';
   hud.innerHTML = `
     <div class="hud-left">
       <div class="hud-brand">
-        <span style="font-size:14px">⚡</span> NEXUS OPS
+        <span style="font-size:14px">⚡</span> NEXORA OPS
       </div>
-      <div id="nexus-status-pill" class="hud-pill demo">
-        <span id="nexus-status-dot" style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#ff9500"></span>
-        <span id="nexus-status-text">CONNECTING...</span>
+      <div id="nexora-status-pill" class="hud-pill demo">
+        <span id="nexora-status-dot" style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#ff9500"></span>
+        <span id="nexora-status-text">CONNECTING...</span>
       </div>
       <div class="hud-diurnal">
         <span>🔄 Cross-Fleet Utilization:</span>
@@ -334,18 +334,18 @@
 
   // Toast Container
   const toastContainer = document.createElement('div');
-  toastContainer.id = 'nexus-toast-container';
+  toastContainer.id = 'nexora-toast-container';
   document.body.appendChild(toastContainer);
 
   // ─── TOAST NOTIFICATION HELPER ─────────────────────────────────────
   function showToast(title, desc, type = 'info', icon = 'ℹ️') {
     const toast = document.createElement('div');
-    toast.className = `nexus-toast ${type}`;
+    toast.className = `nexora-toast ${type}`;
     toast.innerHTML = `
       <div style="font-size:18px">${icon}</div>
       <div style="flex:1">
-        <div class="nexus-toast-title">${title}</div>
-        <div class="nexus-toast-desc">${desc}</div>
+        <div class="nexora-toast-title">${title}</div>
+        <div class="nexora-toast-desc">${desc}</div>
       </div>
       <button style="background:none;border:none;color:#64748b;cursor:pointer;font-size:14px" onclick="this.parentElement.remove()">✕</button>
     `;
@@ -394,9 +394,9 @@
   }
 
   function updateHUDStatus(isLive, label) {
-    const pill = document.getElementById('nexus-status-pill');
-    const dot = document.getElementById('nexus-status-dot');
-    const text = document.getElementById('nexus-status-text');
+    const pill = document.getElementById('nexora-status-pill');
+    const dot = document.getElementById('nexora-status-dot');
+    const text = document.getElementById('nexora-status-text');
 
     if (!pill || !dot || !text) return;
     if (isLive) {
@@ -429,6 +429,11 @@
       elemETA.textContent = data.metrics.avg_eta_minutes.toFixed(1);
     }
 
+    if (!data.demo) {
+      const deadhead = document.getElementById('hud-deadhead');
+      if (deadhead) deadhead.textContent = data.metrics?.deadhead_reduction_pct == null ? 'Deadhead reduction: not measured' : `Deadhead reduction: ${data.metrics.deadhead_reduction_pct}%`;
+      if (!data.fleet?.online_total) document.getElementById('hud-diurnal-metric').textContent = 'No drivers online';
+    }
     // Diurnal HUD metrics
     const diurnalMetric = document.getElementById('hud-diurnal-metric');
     if (diurnalMetric && data.fleet && data.fleet.online_total > 0) {
@@ -447,6 +452,33 @@
 
   // ─── WEBSOCKET SETUP ───────────────────────────────────────────────
   function initSocket() {
+    // Cloudflare delivers authorized events over HTTP; the dashboard also
+    // refreshes its fleet overview every ten seconds.
+    apiFetch('/api/v1/health').then(r => r.json()).then(health => {
+      if (health.realtime_transport !== 'polling') return connectLegacySocket();
+      if (state.eventPoll) clearInterval(state.eventPoll);
+      let cursor = '0', polling = false;
+      state.eventPoll = setInterval(async () => {
+        if (!getToken() || polling) return;
+        polling = true;
+        try {
+          const response = await apiFetch(`/api/v1/events?after=${cursor}`);
+          if (!response.ok) return;
+          const data = await response.json();
+          cursor = data.cursor;
+          for (const item of data.events || []) {
+            const event = item.payload;
+            if (item.event === 'cold_chain:alert' || item.event === 'ops:alert')
+              showToast(event.title, event.desc, item.event === 'cold_chain:alert' ? 'critical' : 'info', event.icon || '🔔');
+            if (item.event === 'fleet:rebalanced') showToast('Fleet Rebalance', event.reasoning, 'info', '🔄');
+          }
+        } catch { /* The next poll retries after a transient connection failure. */ }
+        finally { polling = false; }
+      }, 5000);
+    }).catch(() => {});
+  }
+
+  function connectLegacySocket() {
     function connectSocket() {
       if (typeof io !== 'function') return;
       try {
@@ -463,15 +495,15 @@
         });
 
         socket.on('ops:joined', (info) => {
-          showToast('NEXUS CORE Connected', 'Real-time telemetry and ops alert stream active.', 'success', '🟢');
+          showToast('NEXORA CORE Connected', 'Real-time telemetry and ops alert stream active.', 'success', '🟢');
         });
 
         socket.on('ops:heartbeat', (data) => {
           if (data && data.drivers) {
             state.fleetData = data;
-            if (window.NexusLive.overview) {
-              window.NexusLive.overview.fleet = { ...window.NexusLive.overview.fleet, drivers: data.drivers };
-              window.dispatchEvent(new CustomEvent('nexus:data'));
+            if (window.NexoraLive.overview) {
+              window.NexoraLive.overview.fleet = { ...window.NexoraLive.overview.fleet, drivers: data.drivers };
+              window.dispatchEvent(new CustomEvent('nexora:data'));
             }
           }
         });
@@ -512,24 +544,24 @@
   // ─── MODAL CONTROLS ────────────────────────────────────────────────
   function showModal(title, icon, bodyHtml, onConfirm, confirmText = 'Submit') {
     const backdrop = document.createElement('div');
-    backdrop.className = 'nexus-modal-backdrop';
+    backdrop.className = 'nexora-modal-backdrop';
     backdrop.innerHTML = `
-      <div class="nexus-modal">
-        <div class="nexus-modal-header">
-          <div class="nexus-modal-title"><span>${icon}</span> ${title}</div>
-          <button class="nexus-modal-close" onclick="this.closest('.nexus-modal-backdrop').remove()">✕</button>
+      <div class="nexora-modal">
+        <div class="nexora-modal-header">
+          <div class="nexora-modal-title"><span>${icon}</span> ${title}</div>
+          <button class="nexora-modal-close" onclick="this.closest('.nexora-modal-backdrop').remove()">✕</button>
         </div>
-        <div class="nexus-modal-body">
+        <div class="nexora-modal-body">
           ${bodyHtml}
         </div>
-        <div class="nexus-modal-footer">
-          <button class="hud-btn" onclick="this.closest('.nexus-modal-backdrop').remove()">Cancel</button>
-          <button class="hud-btn primary" id="nexus-modal-confirm">${confirmText}</button>
+        <div class="nexora-modal-footer">
+          <button class="hud-btn" onclick="this.closest('.nexora-modal-backdrop').remove()">Cancel</button>
+          <button class="hud-btn primary" id="nexora-modal-confirm">${confirmText}</button>
         </div>
       </div>
     `;
     document.body.appendChild(backdrop);
-    backdrop.querySelector('#nexus-modal-confirm').onclick = () => {
+    backdrop.querySelector('#nexora-modal-confirm').onclick = () => {
       onConfirm(backdrop);
     };
   }
@@ -550,13 +582,13 @@
       'Operations Sign-in',
       '🔐',
       `
-      <div class="nexus-form-group">
-        <label class="nexus-form-label">Ops / admin email</label>
-        <input class="nexus-form-input" id="ops-email" type="email" autocomplete="username" />
+      <div class="nexora-form-group">
+        <label class="nexora-form-label">Ops / admin email</label>
+        <input class="nexora-form-input" id="ops-email" type="email" autocomplete="username" />
       </div>
-      <div class="nexus-form-group">
-        <label class="nexus-form-label">Password</label>
-        <input class="nexus-form-input" id="ops-pass" type="password" autocomplete="current-password" />
+      <div class="nexora-form-group">
+        <label class="nexora-form-label">Password</label>
+        <input class="nexora-form-input" id="ops-pass" type="password" autocomplete="current-password" />
       </div>
       <div id="ops-login-error" style="font-size:11px;color:#ff6b6b;min-height:14px"></div>
     `,
@@ -589,22 +621,22 @@
   // ─── ACTIONS WIRE-UP ───────────────────────────────────────────────
   document.getElementById('btn-request-ride').onclick = () => {
     showModal(
-      'Price a NEXUS RIDE trip',
+      'Price a NEXORA RIDE trip',
       '🚕',
       `
-      <div class="nexus-form-group">
-        <label class="nexus-form-label">Pickup Address</label>
-        <input class="nexus-form-input" id="r-from" value="Times Square, New York" />
+      <div class="nexora-form-group">
+        <label class="nexora-form-label">Pickup Address</label>
+        <input class="nexora-form-input" id="r-from" value="Times Square, New York" />
       </div>
-      <div class="nexus-form-group">
-        <label class="nexus-form-label">Destination</label>
-        <input class="nexus-form-input" id="r-to" value="JFK International Airport" />
+      <div class="nexora-form-group">
+        <label class="nexora-form-label">Destination</label>
+        <input class="nexora-form-input" id="r-to" value="JFK International Airport" />
       </div>
-      <div class="nexus-form-group">
-        <label class="nexus-form-label">Service Type</label>
-        <select class="nexus-form-select" id="r-type">
+      <div class="nexora-form-group">
+        <label class="nexora-form-label">Service Type</label>
+        <select class="nexora-form-select" id="r-type">
           <option value="taxi">Standard Sedan (4 seats)</option>
-          <option value="luxury">NEXUS Black / Luxury</option>
+          <option value="luxury">NEXORA Black / Luxury</option>
           <option value="suv">SUV XL (6 seats)</option>
           <option value="medical">Medical Priority Transport</option>
           <option value="airport">Airport Shuttle</option>
@@ -654,9 +686,9 @@
       'B2B Freight Instant Quote & Book',
       '📦',
       `
-      <div class="nexus-form-group">
-        <label class="nexus-form-label">Service Category</label>
-        <select class="nexus-form-select" id="f-service">
+      <div class="nexora-form-group">
+        <label class="nexora-form-label">Service Category</label>
+        <select class="nexora-form-select" id="f-service">
           <option value="standard_parcel">Standard Parcel Van (5-50 kg)</option>
           <option value="courier">Express Motorcycle Courier (<5 kg)</option>
           <option value="cold_chain">❄️ Cold-Chain Refrigerated Logistics</option>
@@ -664,13 +696,13 @@
           <option value="express_same_day">Guaranteed Same-Day Urgent</option>
         </select>
       </div>
-      <div class="nexus-form-group">
-        <label class="nexus-form-label">Cargo Weight (kg)</label>
-        <input class="nexus-form-input" id="f-weight" type="number" value="75" />
+      <div class="nexora-form-group">
+        <label class="nexora-form-label">Cargo Weight (kg)</label>
+        <input class="nexora-form-input" id="f-weight" type="number" value="75" />
       </div>
-      <div class="nexus-form-group">
-        <label class="nexus-form-label">Declared Value ($ USD)</label>
-        <input class="nexus-form-input" id="f-val" type="number" value="2500" />
+      <div class="nexora-form-group">
+        <label class="nexora-form-label">Declared Value ($ USD)</label>
+        <input class="nexora-form-input" id="f-val" type="number" value="2500" />
       </div>
     `,
       async (modal) => {
@@ -719,21 +751,21 @@
       'Simulate IoT Cold-Chain Sensor Telemetry',
       '🌡️',
       `
-      <div class="nexus-form-group">
-        <label class="nexus-form-label">Monitored Shipment</label>
-        <select class="nexus-form-select" id="cc-shipment">
+      <div class="nexora-form-group">
+        <label class="nexora-form-label">Monitored Shipment</label>
+        <select class="nexora-form-select" id="cc-shipment">
           <option value="DEL-44200">DEL-44200 (Biological Vaccines — Target: 2°C–6°C)</option>
           <option value="DEL-44207">DEL-44207 (Fresh Seafood/Dairy — Target: 0°C–4°C)</option>
         </select>
       </div>
-      <div class="nexus-form-group">
-        <label class="nexus-form-label">Sensor Temperature Reading (°C)</label>
-        <input class="nexus-form-input" id="cc-temp" type="number" step="0.1" value="11.8" />
+      <div class="nexora-form-group">
+        <label class="nexora-form-label">Sensor Temperature Reading (°C)</label>
+        <input class="nexora-form-input" id="cc-temp" type="number" step="0.1" value="11.8" />
         <div style="font-size:10px;color:#94a3b8;margin-top:4px">Tip: Enter > 6.0°C to simulate an automated excursion alert.</div>
       </div>
-      <div class="nexus-form-group">
-        <label class="nexus-form-label">Sensor Battery Level</label>
-        <input class="nexus-form-input" id="cc-bat" type="number" value="78" />
+      <div class="nexora-form-group">
+        <label class="nexora-form-label">Sensor Battery Level</label>
+        <input class="nexora-form-input" id="cc-bat" type="number" value="78" />
       </div>
     `,
       async (modal) => {

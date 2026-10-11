@@ -62,7 +62,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(nexus_requests_total[5m]))",
+          "expr": "sum(rate(nexora_requests_total[5m]))",
           "legendFormat": "Total RPS",
           "range": true,
           "refId": "A"
@@ -111,7 +111,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(nexus_request_duration_ms_sum[5m]) / clamp_min(rate(nexus_request_duration_ms_count[5m]), 0.0001)",
+          "expr": "rate(nexora_request_duration_ms_sum[5m]) / clamp_min(rate(nexora_request_duration_ms_count[5m]), 0.0001)",
           "legendFormat": "Avg Latency",
           "range": true,
           "refId": "A"
@@ -160,7 +160,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (status_code) (rate(nexus_requests_by_status_total[5m]))",
+          "expr": "sum by (status_code) (rate(nexora_requests_by_status_total[5m]))",
           "legendFormat": "HTTP {{status_code}}",
           "range": true,
           "refId": "A"
@@ -229,7 +229,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(nexus_auth_failures_total[5m]))",
+          "expr": "sum(rate(nexora_auth_failures_total[5m]))",
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -298,7 +298,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "nexus_process_resident_memory_bytes",
+          "expr": "nexora_process_resident_memory_bytes",
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -312,7 +312,7 @@
   "schemaVersion": 39,
   "style": "dark",
   "tags": [
-    "nexus",
+    "nexora",
     "api",
     "operations"
   ],
@@ -325,8 +325,8 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "NEXUS API Overview",
-  "uid": "nexus-api-overview",
+  "title": "NEXORA API Overview",
+  "uid": "nexora-api-overview",
   "version": 1,
   "weekStart": ""
 }

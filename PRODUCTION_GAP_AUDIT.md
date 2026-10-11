@@ -1,4 +1,4 @@
-# NEXUS Production Gap Audit and Build Plan
+# NEXORA Production Gap Audit and Build Plan
 
 ## Status update (2026-10-06)
 
