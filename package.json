@@ -14,6 +14,7 @@
     "install:apk": "adb install -r dist/nexora-logistics.apk",
     "launch:apk": "adb shell am start -n com.nexora.logistics/.MainActivity",
     "test": "node scripts/e2e.js",
+    "test:workspace": "node --test scripts/workspace-session.test.cjs",
     "test:e2e": "node scripts/e2e.js"
   },
   "dependencies": {

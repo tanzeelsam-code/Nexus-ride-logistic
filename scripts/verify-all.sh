@@ -12,12 +12,16 @@ export NODE_ENV="development"
 # 1. Syntax Validations
 echo "1) Checking JavaScript and Python syntax..."
 node --check backend_api.js
+node --check frontend/workspace.js
+node --check frontend/admin.js
+node --check frontend/ops.js
+node --test scripts/workspace-session.test.cjs
 python3 -m py_compile ai_engine.py
 echo "   ✅ Code syntax validation passed."
 
 # 2. Frontend Assets Check
 echo "2) Checking frontend assets..."
-for f in frontend/index.html frontend/ride.html frontend/freight.html frontend/track.html frontend/driver.html frontend/nexora-client.js; do
+for f in frontend/index.html frontend/ride.html frontend/freight.html frontend/track.html frontend/driver.html frontend/nexora-client.js frontend/admin.html frontend/ops.html frontend/workspace.css frontend/workspace.js frontend/admin.js frontend/ops.js; do
   if [ ! -f "$f" ]; then
     echo "   ❌ Missing frontend asset: $f"
     exit 1

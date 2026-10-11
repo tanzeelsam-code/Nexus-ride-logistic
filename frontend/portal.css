@@ -1,1 +1,318 @@
-*{box-sizing:border-box}body{margin:0;background:#080e19;color:#edf3ff;font:16px system-ui;line-height:1.5}main{max-width:940px;margin:40px auto;padding:24px}nav{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:30px}a{color:#61dbef}h1{font-size:38px;margin-bottom:8px}h2{margin-top:0}.card{background:#121e30;border:1px solid #293b55;border-radius:16px;padding:24px;margin:18px 0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px}label{display:block;margin:12px 0}input,select{display:block;width:100%;margin-top:6px;padding:12px;background:#080e19;border:1px solid #516780;border-radius:8px;color:white;font:inherit}button,.button{display:inline-block;background:#54d8dd;color:#06141c;border:0;padding:12px 18px;border-radius:8px;font:600 16px system-ui;cursor:pointer;text-decoration:none;margin:8px 6px 8px 0}button:disabled{opacity:.5;cursor:wait}.secondary{background:#263e59;color:white}.error{color:#ffabac;white-space:pre-wrap}.muted{color:#aabbd2} [hidden]{display:none!important}dt{color:#aabbd2}dd{margin:0 0 12px}.row{border-top:1px solid #33455e;padding:16px 0}small{display:block}
+@import url("workspace.css");
+main {
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 28px 32px 60px;
+}
+nav {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  margin-bottom: 64px;
+  border-bottom: 1px solid var(--line);
+  padding: 0 0 24px;
+}
+nav > a {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+nav > a:first-child {
+  font:
+    800 26px Manrope,
+    system-ui,
+    sans-serif;
+  color: var(--green);
+  letter-spacing: -1.5px;
+  margin-right: auto;
+  text-transform: lowercase;
+}
+nav > a:last-child {
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--green);
+}
+h1 {
+  margin-bottom: 12px;
+}
+main > p {
+  max-width: 650px;
+  color: var(--muted);
+  line-height: 1.8;
+  margin-bottom: 25px;
+}
+.card {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 30px;
+  margin: 24px 0;
+}
+.card h2 {
+  font-size: 21px;
+  margin-bottom: 12px;
+}
+.card p {
+  color: var(--muted);
+  margin: 10px 0 20px;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+}
+.grid .card {
+  margin: 0;
+}
+.card label {
+  margin: 0 0 20px;
+}
+.card .grid {
+  gap: 0 22px;
+}
+.card input,
+.card select {
+  margin-top: 1px;
+}
+.card button:not(.secondary),
+.button {
+  background: var(--green);
+  color: white;
+  border-color: var(--green);
+  margin: 5px 8px 5px 0;
+}
+.card button:not(.secondary):hover,
+.button:hover {
+  background: #184c3a;
+}
+.secondary {
+  background: #f0f3eb;
+  color: var(--green);
+}
+.error {
+  color: var(--danger) !important;
+  white-space: pre-wrap;
+}
+.row {
+  border-top: 1px solid var(--line);
+  padding: 20px 0;
+}
+.row p {
+  margin: 7px 0;
+}
+.row strong {
+  font-size: 15px;
+}
+dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+dd {
+  margin: 4px 0 16px;
+  font-weight: 600;
+}
+small {
+  display: block;
+}
+#registration {
+  max-width: 790px;
+}
+#registration h2 {
+  padding-top: 24px;
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
+}
+#registration .section-title {
+  padding: 0;
+  border: 0;
+  margin-top: 0;
+}
+.registration-intro {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 24px 0;
+  color: var(--green);
+  font-size: 12px;
+}
+.step-number {
+  width: 26px;
+  height: 26px;
+  background: var(--green-soft);
+  border: 1px solid #d8e4d5;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+}
+.registration-intro .step-line {
+  width: 36px;
+  height: 1px;
+  background: #d5dfcd;
+}
+.home-hero {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  align-items: center;
+  gap: 65px;
+  padding: 28px 0 70px;
+}
+.home-hero h1 {
+  font-size: clamp(42px, 5vw, 64px);
+  line-height: 1.12;
+  letter-spacing: -2.8px;
+  margin: 18px 0 23px;
+}
+.home-hero p {
+  font-size: 15px;
+  color: var(--muted);
+  max-width: 395px;
+  line-height: 1.8;
+}
+.home-hero .button {
+  margin-top: 28px;
+  min-height: 47px;
+}
+.journey-card {
+  border: 1px solid #dce5d5;
+  background: #edf2e6;
+  border-radius: 24px;
+  padding: 32px;
+}
+.journey-card .eyebrow {
+  color: #6c8265;
+}
+.journey-card h2 {
+  font-size: 25px;
+  margin: 10px 0 24px;
+}
+.journey-dots {
+  display: grid;
+  gap: 22px;
+  background: #fff;
+  border-radius: 13px;
+  padding: 25px;
+  border: 1px solid #e0e7d9;
+}
+.journey-stop {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 13px;
+}
+.stop-dot {
+  height: 11px;
+  width: 11px;
+  border: 3px solid #819b76;
+  border-radius: 50%;
+  flex: none;
+}
+.stop-dot.end {
+  border-radius: 3px;
+  background: var(--green);
+  border-color: var(--green);
+}
+.journey-stop small {
+  font-size: 10px;
+  margin-bottom: 3px;
+}
+.journey-note {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  color: #6f8365;
+  margin-top: 22px;
+}
+.home-options {
+  border-top: 1px solid var(--line);
+  padding-top: 34px;
+}
+.home-options h2 {
+  margin-bottom: 18px;
+}
+.home-options .card {
+  display: flex;
+  flex-direction: column;
+  padding: 25px;
+}
+.home-options .card h3 {
+  font-size: 18px;
+}
+.home-options .card p {
+  font-size: 12px;
+  line-height: 1.8;
+  flex: 1;
+}
+.home-options .card a {
+  font-size: 12px;
+  font-weight: 650;
+}
+.home-footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 36px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.admin-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 700px) {
+  main {
+    padding: 22px 20px 40px;
+  }
+  nav {
+    gap: 15px;
+    margin-bottom: 38px;
+    padding-bottom: 19px;
+  }
+  nav > a {
+    font-size: 11px;
+  }
+  nav > a:first-child {
+    font-size: 24px;
+  }
+  nav > a:last-child {
+    padding: 6px 9px;
+  }
+  h1 {
+    font-size: 31px;
+  }
+  .card {
+    padding: 23px;
+    margin: 20px 0;
+  }
+  .card h2 {
+    font-size: 19px;
+  }
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .home-hero {
+    grid-template-columns: 1fr;
+    gap: 35px;
+    padding-top: 0;
+    padding-bottom: 40px;
+  }
+  .home-hero h1 {
+    font-size: 46px;
+  }
+  .journey-card {
+    padding: 25px;
+  }
+  .home-options {
+    padding-top: 26px;
+  }
+  .home-options .grid {
+    gap: 12px;
+  }
+  .registration-intro {
+    gap: 8px;
+    font-size: 10px;
+  }
+  .registration-intro .step-line {
+    width: 16px;
+  }
+}
