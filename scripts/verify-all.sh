@@ -16,13 +16,21 @@ node --check frontend/workspace.js
 node --check frontend/admin.js
 node --check frontend/ops.js
 node --check frontend/tracking.js
-node --test scripts/workspace-session.test.cjs scripts/tracking.test.cjs
+node --check frontend/customer.js
+node --check frontend/session.js
+node --check frontend/notifications.js
+node --check frontend/sw.js
+node --check services/maps.cjs
+node --check services/jobs.cjs
+node --check services/payments.cjs
+node --check services/notifications.cjs
+node --test scripts/workspace-session.test.cjs scripts/tracking.test.cjs scripts/integrations.test.cjs scripts/customer-session.test.cjs
 python3 -m py_compile ai_engine.py
 echo "   ✅ Code syntax validation passed."
 
 # 2. Frontend Assets Check
 echo "2) Checking frontend assets..."
-for f in frontend/index.html frontend/ride.html frontend/freight.html frontend/track.html frontend/driver.html frontend/nexora-client.js frontend/admin.html frontend/ops.html frontend/workspace.css frontend/workspace.js frontend/admin.js frontend/ops.js frontend/tracking.css frontend/tracking.js; do
+for f in frontend/customer.html frontend/customer.js frontend/customer.css frontend/session.js frontend/notifications.js frontend/sw.js frontend/driver.css frontend/index.html frontend/ride.html frontend/freight.html frontend/track.html frontend/driver.html frontend/nexora-client.js frontend/admin.html frontend/ops.html frontend/workspace.css frontend/workspace.js frontend/admin.js frontend/ops.js frontend/tracking.css frontend/tracking.js; do
   if [ ! -f "$f" ]; then
     echo "   ❌ Missing frontend asset: $f"
     exit 1

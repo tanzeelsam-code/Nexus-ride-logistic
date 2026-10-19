@@ -8,9 +8,11 @@ WORKDIR /app
 ENV NODE_ENV=production
 RUN addgroup -S nexora && adduser -S nexora -G nexora
 COPY --from=builder /app/node_modules ./node_modules
-COPY package.json backend_api.js ./
-COPY cloudflare/passwords.cjs cloudflare/supabase-ca.crt ./cloudflare/
-COPY frontend ./frontend
+COPY --chown=nexora:nexora package.json backend_api.js ./
+COPY --chown=nexora:nexora cloudflare/passwords.cjs cloudflare/supabase-ca.crt ./cloudflare/
+COPY --chown=nexora:nexora services ./services
+COPY --chown=nexora:nexora supabase/migrations/20261019085513_booking_payments_notifications.sql ./supabase/migrations/
+COPY --chown=nexora:nexora frontend ./frontend
 EXPOSE 3000
 # Run as non-root user
 USER nexora

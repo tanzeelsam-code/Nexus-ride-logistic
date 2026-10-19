@@ -1,5 +1,13 @@
 # NEXORA Production Gap Audit and Build Plan
 
+## Status update (2026-10-19)
+
+Customer address search, map picking, signed fare review, live ride tracking and rating are implemented. The driver portal now shares the light visual style and handles session refresh. Ride card authorization, capture, retry-safe Connect transfers, and opt-in Web Push have integration code and isolated regression tests. Untrained models are excluded from serving; operational decisions use deterministic baselines. See README for migration/configuration and remaining rollout requirements. Real provider credentials and field validation are still needed; this is not a production-readiness certification.
+
+Verified locally: 110 end-to-end checks, 28 session/tracking/provider tests, the payment integration suite against isolated PostgreSQL/Redis with a fake Stripe provider, and three Python baseline tests pass. The Worker dry-run build and local Worker push-encryption check pass. API and AI Docker images build and start; the API readiness probe confirms PostgreSQL and Redis connectivity. Customer booking and both portal layouts were checked in a browser, including mobile sizing. `npm audit` reports no known vulnerabilities in the locked JavaScript dependencies. No production migration or deployment was performed.
+
+The earlier audit below is historical and may describe functionality that has since changed.
+
 ## Status update (2026-10-06)
 
 Re-tested end to end against real PostgreSQL/TimescaleDB, Redis and the AI engine (`npm test`, 100+ checks). Items marked **Fixed** are covered by that suite unless they are infrastructure files (Nginx, compose, Dockerfiles), which were checked by review and `docker compose config` only: Docker Hub was unreachable while testing, so those images were not built.
