@@ -1,0 +1,323 @@
+.tracking-header {
+  position: sticky;
+  top: 0;
+  z-index: 1001;
+  min-height: 80px;
+  padding: 18px max(24px, calc((100vw - 1160px) / 2));
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: center;
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+}
+.tracking-header nav {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.tracking-header .button {
+  font-size: 12px;
+}
+.tracking-main {
+  max-width: 1160px;
+  padding: 46px 24px 26px;
+  margin: auto;
+}
+.tracking-intro {
+  max-width: 670px;
+}
+.tracking-intro h1 {
+  margin: 12px 0;
+}
+.tracking-intro p {
+  color: var(--muted);
+  max-width: 600px;
+  line-height: 1.8;
+}
+.tracking-search {
+  max-width: 680px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 23px;
+  margin: 28px 0;
+}
+.tracking-search > div {
+  display: flex;
+  gap: 10px;
+  margin: 8px 0;
+}
+.tracking-search input {
+  min-width: 0;
+  flex: 1;
+}
+.tracking-search small {
+  font-size: 11px;
+}
+.tracking-placeholder {
+  padding: 45px 24px;
+  min-height: 300px;
+  background: #edf1e5;
+  border: 1px solid #e1e7d8;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  text-align: center;
+}
+.tracking-placeholder h2 {
+  font-size: 22px;
+  margin: 3px 0 10px;
+}
+.tracking-placeholder p {
+  max-width: 440px;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+.tracking-placeholder .button {
+  margin-top: 22px;
+  font-size: 12px;
+}
+.tracking-placeholder .empty-visual {
+  background: white;
+}
+.tracking-result {
+  display: grid;
+  grid-template-columns: minmax(290px, 0.85fr) minmax(0, 1.4fr);
+  gap: 22px;
+  align-items: stretch;
+}
+.tracking-details .panel-header {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.tracking-details h2 {
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
+.tracking-loading {
+  padding: 20px 0;
+  color: var(--muted);
+}
+.delivery-eta {
+  padding: 4px 0 24px;
+  display: grid;
+  gap: 6px;
+}
+.delivery-eta strong {
+  font:
+    700 28px Manrope,
+    system-ui,
+    sans-serif;
+  color: var(--green);
+}
+.tracking-route {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 24px;
+}
+.tracking-route li {
+  position: relative;
+  margin-left: 6px;
+  border-left: 1px dashed #c2d2ba;
+  padding: 0 0 24px 22px;
+}
+.tracking-route li:last-child {
+  border: 0;
+  padding-bottom: 0;
+}
+.tracking-route li::before {
+  content: "";
+  position: absolute;
+  left: -5px;
+  top: 6px;
+  height: 9px;
+  width: 9px;
+  background: #728b65;
+  border: 2px solid #eef2e8;
+  border-radius: 50%;
+}
+.tracking-route li:last-child::before {
+  border-radius: 2px;
+  background: var(--green);
+}
+.tracking-route p {
+  font-size: 13px;
+  line-height: 1.6;
+  margin-top: 3px;
+}
+.tracking-driver {
+  border-top: 1px solid var(--line);
+  padding: 19px 0 0;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.tracking-driver strong,
+.tracking-driver small {
+  display: block;
+}
+.tracking-driver strong {
+  font-size: 13px;
+}
+.tracking-driver small {
+  margin-top: 3px;
+  font-size: 11px;
+}
+.temperature-panel {
+  background: #f5f7f0;
+  border-radius: 12px;
+  padding: 18px;
+  margin-top: 24px;
+}
+.temperature-panel > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.temperature-panel h3 {
+  font-size: 13px;
+}
+.temperature-panel > strong {
+  font:
+    700 30px Manrope,
+    system-ui,
+    sans-serif;
+  display: block;
+  margin: 16px 0 5px;
+}
+.temperature-panel p {
+  font-size: 12px;
+  color: var(--muted);
+}
+.temperature-panel > small {
+  display: block;
+  margin: 5px 0 14px;
+}
+.temperature-panel button {
+  font-size: 11px;
+  width: 100%;
+  min-height: 40px;
+}
+.tracking-map-panel {
+  display: flex;
+  flex-direction: column;
+}
+.tracking-map-panel #map {
+  min-height: 380px;
+  flex: 1;
+  z-index: 1;
+  background: #edf1e5;
+}
+.tracking-map-panel .empty {
+  flex: 1;
+  min-height: 360px;
+}
+.tracking-map-panel .panel-footer {
+  flex-wrap: wrap;
+}
+.delivery-pin {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 3px solid white;
+  background: #21634c;
+  box-shadow: 0 1px 8px #1e443733;
+}
+.delivery-pin.destination {
+  background: #96773f;
+  border-radius: 3px;
+}
+.delivery-vehicle {
+  width: 30px;
+  height: 30px;
+  border: 2px solid white;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #21634c;
+  color: white;
+  box-shadow: 0 1px 8px #1e443733;
+}
+.delivery-vehicle .icon {
+  width: 18px;
+  height: 18px;
+}
+.report-details {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+}
+.report-details div {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+.report-details dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+.report-details dd {
+  margin: 0;
+  font-weight: 600;
+  font-size: 13px;
+  text-align: right;
+}
+@media (max-width: 700px) {
+  .tracking-header {
+    padding: 15px 20px;
+    min-height: 70px;
+    gap: 12px;
+  }
+  .tracking-header .brand {
+    font-size: 22px;
+  }
+  .tracking-header nav {
+    gap: 6px;
+  }
+  .tracking-header .button {
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+  .tracking-main {
+    padding: 30px 18px 20px;
+  }
+  .tracking-intro h1 {
+    font-size: 29px;
+  }
+  .tracking-intro p {
+    font-size: 13px;
+  }
+  .tracking-search {
+    padding: 18px;
+  }
+  .tracking-search > div {
+    flex-direction: column;
+  }
+  .tracking-search button {
+    min-height: 44px;
+  }
+  .tracking-placeholder {
+    padding: 30px 22px;
+  }
+  .tracking-placeholder h2 {
+    font-size: 19px;
+  }
+  .tracking-result {
+    grid-template-columns: 1fr;
+  }
+  .tracking-map-panel #map {
+    height: 330px;
+    min-height: 330px;
+    flex: none;
+  }
+  .tracking-map-panel .empty {
+    min-height: 220px;
+  }
+}

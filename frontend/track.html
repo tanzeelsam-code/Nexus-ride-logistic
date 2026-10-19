@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#21634c" />
+    <title>Track a delivery · Nexora</title>
+    <link rel="stylesheet" href="/workspace.css" />
+    <link rel="stylesheet" href="/tracking.css" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <script
+      defer
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script defer src="/workspace.js"></script>
+    <script defer src="/tracking.js"></script>
+  </head>
+  <body>
+    <header class="tracking-header">
+      <a class="brand" href="/" aria-label="Nexora home"
+        ><span class="brand-mark">n</span>nexora</a
+      >
+      <nav aria-label="Account navigation">
+        <a class="button" href="/admin.html" id="workspace-link"
+          >Workspace <span data-icon="arrow"></span></a
+        ><button class="header-signout" id="tracking-signout" hidden>
+          <span data-icon="logout"></span>Sign out
+        </button>
+      </nav>
+    </header>
+    <main class="tracking-main">
+      <section class="tracking-intro">
+        <span class="eyebrow">Every step, a little closer</span>
+        <h1>Track your delivery.</h1>
+        <p>
+          Enter the tracking code shared by your sender to see the latest
+          delivery status and location.
+        </p>
+      </section>
+      <form
+        class="tracking-search"
+        id="tracking-search"
+        action="/track.html"
+        method="get"
+      >
+        <label for="tracking-code">Tracking code</label>
+        <div>
+          <input
+            id="tracking-code"
+            name="id"
+            placeholder="Enter your tracking code"
+            autocomplete="off"
+            spellcheck="false"
+            maxlength="200"
+            pattern="[A-Za-z0-9_\-]+"
+            title="Enter the tracking code from your sender, using letters, numbers, hyphens, or underscores."
+            required
+          /><button type="submit" class="primary">
+            Track delivery <span data-icon="arrow"></span>
+          </button>
+        </div>
+        <small
+          >You'll find this in the delivery confirmation or tracking link from
+          your sender.</small
+        >
+      </form>
+      <div class="notice error" id="tracking-error" role="alert" hidden>
+        <span id="tracking-error-text"></span
+        ><button id="retry-tracking">Try again</button>
+      </div>
+      <p class="tracking-loading" id="tracking-loading" role="status" hidden>
+        Finding your delivery…
+      </p>
+      <section class="tracking-placeholder" id="tracking-placeholder">
+        <span class="empty-visual" data-icon="box"></span>
+        <h2>From the sender to your doorstep.</h2>
+        <p>
+          Your route, delivery updates, and driver details will appear here once
+          you enter a valid tracking code.
+        </p>
+        <a href="/" class="button">Back to Nexora</a>
+      </section>
+      <div class="tracking-result" id="tracking-result" hidden>
+        <section class="panel tracking-details">
+          <header class="panel-header">
+            <div>
+              <p class="eyebrow">Your delivery</p>
+              <h2 id="delivery-code">—</h2>
+            </div>
+            <span class="badge" id="delivery-status">—</span>
+          </header>
+          <div class="panel-body">
+            <div class="delivery-eta">
+              <small id="eta-label">Estimated arrival</small
+              ><strong id="eta-display">Awaiting estimate</strong>
+            </div>
+            <ol class="tracking-route">
+              <li>
+                <small>Pickup</small>
+                <p id="pickup-address">—</p>
+              </li>
+              <li>
+                <small>Destination</small>
+                <p id="destination-address">—</p>
+              </li>
+            </ol>
+            <div class="tracking-driver">
+              <span class="avatar" data-icon="users"></span>
+              <div>
+                <strong id="driver-name">Awaiting driver</strong
+                ><small id="driver-vehicle"></small>
+              </div>
+            </div>
+            <section class="temperature-panel" id="temperature-panel" hidden>
+              <div>
+                <h3>Temperature care</h3>
+                <span class="badge" id="temperature-status">—</span>
+              </div>
+              <strong id="temperature-value">—</strong>
+              <p id="temperature-range"></p>
+              <small id="temperature-excursions"></small
+              ><button id="temperature-report">
+                View temperature report <span data-icon="arrow"></span>
+              </button>
+            </section>
+          </div>
+        </section>
+        <section class="panel tracking-map-panel">
+          <header class="panel-header">
+            <div>
+              <h2>Delivery location</h2>
+              <p id="map-caption">Latest available route and location.</p>
+            </div>
+            <span data-icon="pin"></span>
+          </header>
+          <div
+            id="map"
+            role="region"
+            aria-label="Delivery route map"
+            hidden
+          ></div>
+          <div id="map-empty" class="empty">
+            <span class="empty-visual" data-icon="pin"></span>
+            <h3>Location not available yet</h3>
+            <p>
+              Your delivery details are available. The map will appear when
+              location data arrives.
+            </p>
+          </div>
+          <footer class="panel-footer">
+            <span data-icon="clock"></span
+            ><span id="tracking-updated">Updates every 10 seconds</span>
+          </footer>
+        </section>
+      </div>
+      <footer class="page-footer">
+        <span>Nexora · A little more connected.</span
+        ><a href="/">Back to home</a>
+      </footer>
+    </main>
+  </body>
+</html>

@@ -1,5 +1,5 @@
 /**
- * NEXUS LOGISTICS — BACKEND API
+ * NEXORA LOGISTICS — BACKEND API
  * ===============================
  * Node.js + Fastify REST API
  * Handles: Auth, Trips, Deliveries, Drivers, Payments, Real-time
@@ -14,21 +14,30 @@ const { Pool } = require('pg');
 const Redis = require('ioredis');
 const { Server: SocketIO } = require('socket.io');
 const { z } = require('zod');
-const bcrypt = require('bcrypt');
-const { v4: uuidv4 } = require('uuid');
+const defaultPasswords = require('./cloudflare/passwords.cjs');
+const { randomUUID: uuidv4 } = require('node:crypto');
 const Stripe = require('stripe');
 const axios = require('axios');
 const pino = require('pino');
 const crypto = require('crypto');
+const path = require('path');
+const fs = require('fs');
+const { createMaps, bookingFingerprint, unavailable } = require('./services/maps.cjs');
+const { createJobs } = require('./services/jobs.cjs');
+const { createPayments } = require('./services/payments.cjs');
+const { createNotifications } = require('./services/notifications.cjs');
 
 // ============================================================
 // CONFIGURATION
 // ============================================================
 
-const isProduction = process.env.NODE_ENV === 'production';
+function createBackend(runtime = {}) {
+const bcrypt = runtime.passwords || defaultPasswords;
+const environment = runtime.env || process.env;
+const isProduction = environment.NODE_ENV === 'production';
 
 function getEnv(name, fallback) {
-  const value = process.env[name];
+  const value = environment[name];
   if (value === undefined || value === null || String(value).trim() === '') {
     return fallback;
   }
@@ -39,15 +48,13 @@ function validateRuntimeConfig(cfg) {
   if (!isProduction) return;
 
   const requiredEnvVars = [
-    'DB_PASSWORD',
-    'REDIS_PASSWORD',
+    ...(!runtime.edge ? ['DB_PASSWORD', 'REDIS_PASSWORD'] : []),
+    ...(getEnv('CARD_PAYMENTS_ENABLED', 'false') === 'true' ? ['STRIPE_SECRET_KEY','STRIPE_WEBHOOK_SECRET','STRIPE_PUBLISHABLE_KEY'] : []),
     'JWT_SECRET',
-    'STRIPE_SECRET_KEY',
-    'STRIPE_WEBHOOK_SECRET'
   ];
 
   for (const key of requiredEnvVars) {
-    if (!process.env[key] || !String(process.env[key]).trim()) {
+    if (!environment[key] || !String(environment[key]).trim()) {
       throw new Error(`Missing required environment variable in production: ${key}`);
     }
   }
@@ -56,9 +63,7 @@ function validateRuntimeConfig(cfg) {
     throw new Error('JWT_SECRET must be at least 32 characters in production');
   }
 
-  if (cfg.stripe.secretKey.startsWith('sk_test_')) {
-    throw new Error('STRIPE_SECRET_KEY must be a live key in production');
-  }
+  if (getEnv('CARD_PAYMENTS_ENABLED','false') === 'true' && !/^(sk|rk)_(live|test)_[A-Za-z0-9]{16,}$/.test(cfg.stripe.secretKey)) throw new Error('A valid Stripe key is required when card payments are enabled');
 
   if (cfg.cors.origins.length === 0) {
     throw new Error('ALLOWED_ORIGINS must be explicitly set in production');
@@ -75,9 +80,11 @@ const config = {
     database: getEnv('DB_NAME', 'nexusdb'),
     user: getEnv('DB_USER', 'nexus'),
     password: getEnv('DB_PASSWORD', isProduction ? '' : 'nexus_secret'),
+    // Hosted Postgres (e.g. Supabase) requires TLS; local Docker does not.
+    ssl: getEnv('DB_SSL', 'false') === 'true' ? { rejectUnauthorized: true, ca: fs.readFileSync(getEnv('DB_SSL_CA_FILE', 'cloudflare/supabase-ca.crt'), 'utf8') } : false,
     max: 20,                          // Connection pool size
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
+    connectionTimeoutMillis: Number(getEnv('DB_CONNECT_TIMEOUT_MS', 2000)),
   },
   
   redis: {
@@ -89,13 +96,13 @@ const config = {
   },
   
   jwt: {
-    secret: getEnv('JWT_SECRET', isProduction ? '' : 'dev_nexus_jwt_secret_please_change_me_32_chars'),
+    secret: getEnv('JWT_SECRET', isProduction ? '' : 'dev_nexora_jwt_secret_please_change_me_32_chars'),
     expiresIn: getEnv('JWT_EXPIRES_IN', '24h'),
     refreshExpiresIn: getEnv('JWT_REFRESH_EXPIRES_IN', '30d'),
   },
   
   stripe: {
-    secretKey: getEnv('STRIPE_SECRET_KEY', isProduction ? '' : 'sk_test_123'),
+    secretKey: getEnv('STRIPE_SECRET_KEY', 'sk_test_unconfigured'),
     webhookSecret: getEnv('STRIPE_WEBHOOK_SECRET', isProduction ? '' : 'whsec_123'),
   },
   
@@ -144,7 +151,7 @@ const idempotencyProcessingTtlSeconds = Number(getEnv('IDEMPOTENCY_PROCESSING_TT
 // ============================================================
 
 const logger = pino({
-  level: process.env.LOG_LEVEL || 'info',
+  level: environment.LOG_LEVEL || 'info',
   // Pretty output is for local development only; production logs stay structured JSON.
   ...(isProduction ? {} : {
     transport: {
@@ -154,7 +161,7 @@ const logger = pino({
   })
 });
 
-const metrics = {
+const metrics = runtime.metrics || {
   startedAtMs: Date.now(),
   requestsTotal: 0,
   requestDurationMsSum: 0,
@@ -170,30 +177,30 @@ function incrementStatusCount(statusCode) {
 
 function formatPrometheusMetrics() {
   const lines = [
-    '# HELP nexus_requests_total Total HTTP requests served by the API.',
-    '# TYPE nexus_requests_total counter',
-    `nexus_requests_total ${metrics.requestsTotal}`,
-    '# HELP nexus_request_duration_ms_sum Total request duration in milliseconds.',
-    '# TYPE nexus_request_duration_ms_sum counter',
-    `nexus_request_duration_ms_sum ${metrics.requestDurationMsSum}`,
-    '# HELP nexus_request_duration_ms_count Total number of timed requests.',
-    '# TYPE nexus_request_duration_ms_count counter',
-    `nexus_request_duration_ms_count ${metrics.requestDurationMsCount}`,
-    '# HELP nexus_auth_failures_total Total authentication failures.',
-    '# TYPE nexus_auth_failures_total counter',
-    `nexus_auth_failures_total ${metrics.authFailuresTotal}`,
-    '# HELP nexus_requests_by_status_total Requests grouped by HTTP status code.',
-    '# TYPE nexus_requests_by_status_total counter',
-    '# HELP nexus_process_uptime_seconds API process uptime in seconds.',
-    '# TYPE nexus_process_uptime_seconds gauge',
-    `nexus_process_uptime_seconds ${Math.floor(process.uptime())}`,
-    '# HELP nexus_process_resident_memory_bytes Resident set size memory in bytes.',
-    '# TYPE nexus_process_resident_memory_bytes gauge',
-    `nexus_process_resident_memory_bytes ${process.memoryUsage().rss}`
+    '# HELP nexora_requests_total Total HTTP requests served by the API.',
+    '# TYPE nexora_requests_total counter',
+    `nexora_requests_total ${metrics.requestsTotal}`,
+    '# HELP nexora_request_duration_ms_sum Total request duration in milliseconds.',
+    '# TYPE nexora_request_duration_ms_sum counter',
+    `nexora_request_duration_ms_sum ${metrics.requestDurationMsSum}`,
+    '# HELP nexora_request_duration_ms_count Total number of timed requests.',
+    '# TYPE nexora_request_duration_ms_count counter',
+    `nexora_request_duration_ms_count ${metrics.requestDurationMsCount}`,
+    '# HELP nexora_auth_failures_total Total authentication failures.',
+    '# TYPE nexora_auth_failures_total counter',
+    `nexora_auth_failures_total ${metrics.authFailuresTotal}`,
+    '# HELP nexora_requests_by_status_total Requests grouped by HTTP status code.',
+    '# TYPE nexora_requests_by_status_total counter',
+    '# HELP nexora_process_uptime_seconds API process uptime in seconds.',
+    '# TYPE nexora_process_uptime_seconds gauge',
+    `nexora_process_uptime_seconds ${Math.floor(process.uptime())}`,
+    '# HELP nexora_process_resident_memory_bytes Resident set size memory in bytes.',
+    '# TYPE nexora_process_resident_memory_bytes gauge',
+    `nexora_process_resident_memory_bytes ${process.memoryUsage().rss}`
   ];
 
   for (const [statusCode, count] of metrics.statusCounts.entries()) {
-    lines.push(`nexus_requests_by_status_total{status_code="${statusCode}"} ${count}`);
+    lines.push(`nexora_requests_by_status_total{status_code="${statusCode}"} ${count}`);
   }
 
   return `${lines.join('\n')}\n`;
@@ -244,9 +251,8 @@ const inMemoryStore = {
   kv: new Map(),
 };
 
-const db = new Pool({
+const db = runtime.db || new Pool({
   ...config.db,
-  connectionTimeoutMillis: 2000,
 });
 
 db.on('error', (err) => {
@@ -305,13 +311,16 @@ async function ensureOperationalTables() {
   `);
 
   await query('CREATE INDEX IF NOT EXISTS idx_stripe_webhooks_received_at ON stripe_webhook_events(received_at DESC)');
+
+  // Proof of delivery: who signed for it. Added after the initial schema.
+  await query('ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS dropoff_recipient_name VARCHAR(100)');
 }
 
 // ============================================================
 // REDIS
 // ============================================================
 
-const redis = new Redis({
+const redis = runtime.redis || new Redis({
   ...config.redis,
   maxRetriesPerRequest: 1,
   enableOfflineQueue: false,
@@ -428,6 +437,7 @@ const kv = {
 
 const app = Fastify({
   logger: false,  // Using custom pino logger
+  pluginTimeout: runtime.edge ? 0 : 10000,
   trustProxy: true,
   bodyLimit: 5 * 1024 * 1024,  // 5MB
 });
@@ -458,13 +468,17 @@ app.register(require('@fastify/jwt'), {
   sign: { expiresIn: config.jwt.expiresIn }
 });
 
-app.register(require('@fastify/rate-limit'), {
+if (!runtime.edge) app.register(require('@fastify/rate-limit'), {
   global: true,
   max: 100,
   timeWindow: '1 minute',
-  redis,
+  ...(runtime.edge ? { store: runtime.rateStore } : { redis }),
+  // If Redis is unreachable, serve the request rather than failing it with a 500.
+  skipOnError: !runtime.edge,
   keyGenerator: (req) => req.ip
 });
+
+if (runtime.edge) app.addHook('onRequest', runtime.rateLimit);
 
 app.register(require('@fastify/multipart'));
 app.register(require('fastify-raw-body'), {
@@ -472,6 +486,12 @@ app.register(require('fastify-raw-body'), {
   global: false,
   encoding: false,
   runFirst: true,
+});
+
+if (!runtime.edge) app.register(require('@fastify/static'), {
+  root: path.join(__dirname, 'frontend'),
+  prefix: '/',
+  decorateReply: false
 });
 
 async function persistRefreshTokenSession({ jti, userId, role }) {
@@ -567,7 +587,7 @@ const authenticate = async (req, reply) => {
     await req.jwtVerify();
 
     // Refresh tokens must only be exchanged at /auth/refresh, never used as access tokens.
-    if (req.user.type === 'refresh') {
+    if (req.user.type) {
       metrics.authFailuresTotal += 1;
       return reply.code(401).send({ error: 'Authentication required' });
     }
@@ -742,7 +762,20 @@ app.addHook('onResponse', (req, reply, done) => {
 // STRIPE
 // ============================================================
 
-const stripe = Stripe(config.stripe.secretKey);
+const stripe = runtime.stripe || Stripe(config.stripe.secretKey, { timeout:8000, maxNetworkRetries:0, ...(runtime.edge ? { httpClient: Stripe.createFetchHttpClient() } : {}) });
+const maps = createMaps({ token: config.maps.apiKey, allowApproximate: !isProduction && !config.maps.apiKey, fetch: runtime.fetch });
+const jobs = createJobs(query);
+const cardsEnabled = getEnv('CARD_PAYMENTS_ENABLED', 'false') === 'true' && !!getEnv('STRIPE_PUBLISHABLE_KEY', '') && !!config.stripe.webhookSecret;
+
+function readQuote(token, body) {
+  let quote;
+  try { quote = app.jwt.verify(token); } catch { throw unavailable('Your fare expired. Please check the fare again.', 409); }
+  if (quote.type !== 'ride_quote' || !quote.pricing || (body && quote.fingerprint !== bookingFingerprint(body))) {
+    throw unavailable('Your journey changed. Please check the fare again.', 409);
+  }
+  return quote;
+}
+
 
 // ============================================================
 // AI ENGINE CLIENT
@@ -754,14 +787,9 @@ const AI = {
     return data;
   },
   async price(payload) {
-    try {
-      const { data } = await axios.post(`${config.ai.baseUrl}/price`, payload, { timeout: 5000 });
-      return data;
-    } catch (err) {
-      // AI engine unreachable: fall back to the published rate card so booking keeps working.
-      logger.warn({ msg: err.message }, 'AI pricing unavailable; using local rate card');
-      return localPrice(payload);
-    }
+    // Published rates and provider road routes are deterministic and auditable.
+    const route = await maps.route(payload);
+    return { ...localPrice({ ...payload, route }), route, pricing_source: 'published_rate_card' };
   },
   async checkFraud(payload) {
     const { data } = await axios.post(`${config.ai.baseUrl}/fraud/check`, payload, { timeout: 3000 });
@@ -807,8 +835,8 @@ const round2 = (n) => Number(Number(n).toFixed(2));
 
 function localPrice(p) {
   // Straight-line distance understates road distance; 1.3 is a common urban detour factor.
-  const km = Math.max(0.5, haversineKm(p.pickup_lat, p.pickup_lng, p.dropoff_lat, p.dropoff_lng) * 1.3);
-  const minutes = (km / 30) * 60;
+  const km = Math.max(0.5, p.route?.distance_km ?? haversineKm(p.pickup_lat, p.pickup_lng, p.dropoff_lat, p.dropoff_lng) * 1.3);
+  const minutes = p.route?.duration_minutes ?? (km / 30) * 60;
   const freight = ['freight', 'courier', 'cold_chain'].includes(p.service_type);
   let base = freight ? 5.0 : 2.5;
   let distanceFare = km * (freight ? 2.0 : 1.2);
@@ -839,7 +867,7 @@ function localPrice(p) {
 // VALIDATION SCHEMAS
 // ============================================================
 
-const DUMMY_BCRYPT_HASH = bcrypt.hashSync('nexus-timing-equaliser', 10);
+const DUMMY_BCRYPT_HASH = '$2b$12$Au7o3hmn4SrRRKy2FTFCcelpkInFfZKgJJSUO.SjQbxu1YNwb8d06';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TRIP_STATUSES = ['requested', 'searching', 'accepted', 'driver_en_route', 'arrived', 'in_progress', 'completed', 'cancelled', 'failed'];
 const VEHICLE_TYPES = ['sedan', 'hatchback', 'suv', 'luxury', 'van', 'truck_small', 'truck_medium', 'truck_large', 'refrigerated', 'motorcycle', 'bicycle'];
@@ -850,7 +878,7 @@ const schemas = {
     phone: z.string().min(8).max(20),
     first_name: z.string().min(1).max(100),
     last_name: z.string().min(1).max(100),
-    password: z.string().min(8).max(100),
+    password: z.string().min(8).max(72).refine(value => Buffer.byteLength(value, 'utf8') <= 72, 'Password must be at most 72 bytes'),
     referral_code: z.string().optional(),
   }),
   
@@ -869,13 +897,13 @@ const schemas = {
     phone: z.string().min(8).max(20),
     first_name: z.string().min(1).max(100),
     last_name: z.string().min(1).max(100),
-    password: z.string().min(8).max(100),
+    password: z.string().min(8).max(72).refine(value => Buffer.byteLength(value, 'utf8') <= 72, 'Password must be at most 72 bytes'),
     mode: z.enum(['ride', 'freight', 'both']).default('ride'),
     vehicle: z.object({
       plate_number: z.string().min(2).max(20),
       make: z.string().min(1).max(50),
       model: z.string().min(1).max(50),
-      year: z.number().int().min(1990).max(new Date().getFullYear() + 1),
+      year: z.number().int().min(1990).refine(value => value <= new Date().getFullYear() + 1, 'Vehicle year cannot be later than next year'),
       color: z.string().min(1).max(30),
       vehicle_type: z.enum(VEHICLE_TYPES),
     }),
@@ -903,7 +931,9 @@ const schemas = {
     dropoff_address: z.string().min(1),
     service_type: z.enum(['taxi', 'freight', 'medical', 'airport', 'courier', 'cold_chain']).default('taxi'),
     vehicle_type: z.enum(VEHICLE_TYPES).optional(),
-    payment_method: z.enum(['card', 'cash', 'wallet', 'corporate']).default('card'),
+    payment_method: z.enum(['card', 'cash']).default('cash'),
+    quote_token: z.string().max(150000).optional(),
+    payment_intent_id: z.string().max(100).optional(),
     passengers: z.number().int().min(1).max(8).default(1),
     scheduled_for: z.string().datetime().optional(),
     promo_code: z.string().optional(),
@@ -948,6 +978,13 @@ const schemas = {
     insurance_requested: z.boolean().default(false),
   }),
 
+  // Signature arrives as a PNG data URL from the driver app's signature pad (~200 KB cap).
+  proofOfDelivery: z.object({
+    otp: z.union([z.string(), z.number()]).optional(),
+    recipient_name: z.string().trim().min(1).max(100).optional(),
+    pod_signature: z.string().max(200_000).regex(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/, 'Signature must be a PNG data URL').optional(),
+    pod_photo_url: z.string().url().max(2000).optional(),
+  }).passthrough(),
   coldChainTelemetry: z.object({
     delivery_id: z.string().regex(/^[A-Za-z0-9_-]{1,60}$/, 'delivery_id may contain letters, digits, - and _ only'),
     temperature_c: z.number().min(-100).max(100),
@@ -974,8 +1011,9 @@ function validate(schema, data) {
 app.get('/health', async () => {
   return {
     status: 'ok',
-    service: 'nexus-api',
+    service: 'nexora-api',
     uptime_sec: Math.floor(process.uptime()),
+    realtime_transport: runtime.edge ? 'polling' : 'socket.io',
     timestamp: new Date().toISOString(),
   };
 });
@@ -983,8 +1021,9 @@ app.get('/health', async () => {
 app.get('/api/v1/health', async () => {
   return {
     status: 'ok',
-    service: 'nexus-api',
+    service: 'nexora-api',
     uptime_sec: Math.floor(process.uptime()),
+    realtime_transport: runtime.edge ? 'polling' : 'socket.io',
     timestamp: new Date().toISOString(),
   };
 });
@@ -992,7 +1031,7 @@ app.get('/api/v1/health', async () => {
 const readinessHandler = async (req, reply) => {
   const checks = {
     database: 'down',
-    redis: 'down',
+    [runtime.edge ? 'session_store' : 'redis']: 'down',
   };
 
   let ready = true;
@@ -1007,7 +1046,7 @@ const readinessHandler = async (req, reply) => {
 
   try {
     const pong = await redis.ping();
-    checks.redis = pong === 'PONG' ? 'up' : 'degraded';
+    checks[runtime.edge ? 'session_store' : 'redis'] = pong === 'PONG' ? 'up' : 'degraded';
     if (pong !== 'PONG') ready = false;
   } catch (err) {
     ready = false;
@@ -1336,29 +1375,27 @@ async function addDeclined(kind, id, driverId) {
   await kv.setex(`declined:${kind}:${id}`, 3600, JSON.stringify(list));
 }
 
-// Rank candidates with the AI engine; fall back to nearest-first if it is unreachable.
+// The default ranking is proximity. Road ETAs are independent of model scores.
 async function rankCandidates(request, candidates) {
-  let order = candidates.map((c) => c.id);
-  let meta = { ai_score: null, eta_pickup_min: null, eta_dropoff_min: null, alternatives_considered: candidates.length };
-  try {
-    const decision = await AI.dispatch({ ...request, drivers: candidates });
-    if (decision?.driver_id && order.includes(decision.driver_id)) {
-      order = [decision.driver_id, ...order.filter((id) => id !== decision.driver_id)];
-      meta = {
-        ai_score: decision.ai_score ?? null,
-        eta_pickup_min: decision.eta_pickup_min ?? null,
-        eta_dropoff_min: decision.eta_dropoff_min ?? null,
-        alternatives_considered: decision.alternatives_considered ?? candidates.length,
-      };
-    }
-  } catch (err) {
-    logger.warn({ msg: err.message }, 'AI dispatch unavailable; using nearest-driver ranking');
+  let order = candidates.map(c=>c.id);
+  const meta = { ai_score:null, eta_pickup_min:null, eta_dropoff_min:null, alternatives_considered:candidates.length };
+  if (getEnv('AI_DISPATCH_ENABLED','false') === 'true') {
+    try {
+      const decision = await AI.dispatch({ ...request, drivers:candidates });
+      if (decision.model_status === 'validated' && order.includes(decision.driver_id)) {
+        order = [decision.driver_id,...order.filter(id=>id!==decision.driver_id)];
+        meta.ai_score = decision.ai_score ?? null;
+      }
+    } catch { /* Proximity remains available when the optional model is down. */ }
   }
-  if (meta.eta_pickup_min === null) {
-    const first = candidates.find((c) => c.id === order[0]);
-    meta.eta_pickup_min = Number(((first.distance_m / 1000) / 30 * 60 + 1).toFixed(1));
+  const first = candidates.find(c=>c.id===order[0]);
+  if (first) {
+    try {
+      const route = await maps.route({pickup_lat:first.lat,pickup_lng:first.lng,dropoff_lat:request.pickup_lat,dropoff_lng:request.pickup_lng});
+      meta.eta_pickup_min = Number(route.duration_minutes.toFixed(1));
+    } catch { /* Do not claim a road ETA when the provider is unavailable. */ }
   }
-  return { order, meta };
+  return {order,meta};
 }
 
 async function dispatchTrip(tripId) {
@@ -1384,7 +1421,7 @@ async function dispatchTrip(tripId) {
         "UPDATE trips SET status = 'failed', cancelled_by = 'system', cancellation_reason = 'No driver available' WHERE id = $1 AND status IN ('requested','searching')",
         [trip.id]
       );
-      if (rowCount) io.to(`user:${trip.customer_id}`).emit('trip:dispatch_failed', { trip_id: trip.id, reason: 'no_driver_available' });
+      if (rowCount) await emitEvent(`user:${trip.customer_id}`, 'trip:dispatch_failed', { trip_id: trip.id, reason: 'no_driver_available' });
     }
     return;
   }
@@ -1418,7 +1455,7 @@ async function dispatchTrip(tripId) {
     }
 
     const driver = candidates.find((c) => c.id === driverId);
-    io.to(`driver:${driverId}`).emit('trip:new_request', {
+    await emitEvent(`driver:${driverId}`, 'trip:new_request', {
       trip_id: trip.id,
       pickup_address: trip.pickup_address,
       dropoff_address: trip.dropoff_address,
@@ -1426,7 +1463,7 @@ async function dispatchTrip(tripId) {
       eta_pickup_min: meta.eta_pickup_min,
       respond_within_sec: driverResponseTimeoutMs / 1000,
     });
-    io.to(`user:${trip.customer_id}`).emit('trip:driver_offered', { trip_id: trip.id, eta_pickup_min: meta.eta_pickup_min });
+    await emitEvent(`user:${trip.customer_id}`, 'trip:driver_offered', { trip_id: trip.id, eta_pickup_min: meta.eta_pickup_min });
     logger.info({ tripId: trip.id, driverId, distance_m: driver?.distance_m }, 'Trip offered to driver');
     return;
   }
@@ -1439,7 +1476,7 @@ async function failOrRedispatchTrip(trip, reason) {
     UPDATE trips SET status = 'searching', driver_id = NULL, driver_assigned_at = NULL
     WHERE id = $1 AND status = 'accepted' AND driver_id = $2
   `, [trip.id, trip.driver_id]);
-  io.to(`user:${trip.customer_id}`).emit('trip:searching', { trip_id: trip.id, reason });
+  await emitEvent(`user:${trip.customer_id}`, 'trip:searching', { trip_id: trip.id, reason });
   await dispatchTrip(trip.id);
 }
 
@@ -1459,14 +1496,14 @@ async function driverTripAction(driver, tripId, action, body = {}) {
   if (action === 'accept') {
     if (trip.status !== 'accepted') return bad();
     await query("UPDATE trips SET status = 'driver_en_route' WHERE id = $1 AND status = 'accepted'", [trip.id]);
-    io.to(`user:${trip.customer_id}`).emit('trip:driver_en_route', { trip_id: trip.id, driver_id: driver.id });
+    await emitEvent(`user:${trip.customer_id}`, 'trip:driver_en_route', { trip_id: trip.id, driver_id: driver.id });
     return { code: 200, body: { message: 'Trip accepted', status: 'driver_en_route' } };
   }
 
   if (action === 'arrive') {
     if (trip.status !== 'driver_en_route') return bad();
     await query("UPDATE trips SET status = 'arrived', driver_arrived_at = NOW() WHERE id = $1 AND status = 'driver_en_route'", [trip.id]);
-    io.to(`user:${trip.customer_id}`).emit('trip:driver_arrived', { trip_id: trip.id });
+    await emitEvent(`user:${trip.customer_id}`, 'trip:driver_arrived', { trip_id: trip.id });
     return { code: 200, body: { message: 'Arrival recorded', status: 'arrived' } };
   }
 
@@ -1476,7 +1513,7 @@ async function driverTripAction(driver, tripId, action, body = {}) {
       return { code: 403, body: { error: 'Invalid rider OTP' } };
     }
     await query("UPDATE trips SET status = 'in_progress', trip_started_at = NOW() WHERE id = $1 AND status = 'arrived'", [trip.id]);
-    io.to(`user:${trip.customer_id}`).emit('trip:started', { trip_id: trip.id });
+    await emitEvent(`user:${trip.customer_id}`, 'trip:started', { trip_id: trip.id });
     return { code: 200, body: { message: 'Trip started', status: 'in_progress' } };
   }
 
@@ -1500,23 +1537,24 @@ async function driverTripAction(driver, tripId, action, body = {}) {
       await client.query(`
         UPDATE drivers SET total_trips = total_trips + 1, completed_trips = completed_trips + 1,
           total_km_driven = total_km_driven + $1, total_earnings = total_earnings + $2,
-          pending_payout = pending_payout + $2, status = 'available'
+          status = 'available'
         WHERE id = $3
       `, [distanceKm, driverEarnings, driver.id]);
       await client.query(`
-        INSERT INTO payments (payment_ref, trip_id, customer_id, amount, currency, method, status, gateway, captured_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        INSERT INTO payments (payment_ref, trip_id, customer_id, amount, currency, method, status, gateway, captured_at, gateway_ref)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       `, [
         `PAY-${trip.trip_number}`, trip.id, trip.customer_id, fare, trip.currency || 'USD',
         trip.payment_method || 'card',
         trip.payment_method === 'cash' ? 'captured' : 'pending',
         trip.payment_method === 'cash' ? 'cash' : 'stripe',
-        trip.payment_method === 'cash' ? new Date() : null,
+        trip.payment_method === 'cash' ? new Date() : null, trip.stripe_payment_intent_id || null,
       ]);
+      if (trip.payment_method === 'card') await jobs.enqueue('capture', `capture:${trip.id}`, { trip_id: trip.id }, client);
       return true;
     });
     if (!result) return bad();
-    io.to(`user:${trip.customer_id}`).emit('trip:completed', { trip_id: trip.id, total_fare: fare, request_rating: true });
+    await emitEvent(`user:${trip.customer_id}`, 'trip:completed', { trip_id: trip.id, total_fare: fare, request_rating: true });
     return { code: 200, body: { message: 'Trip completed', status: 'completed', fare, platform_fee: platformFee, driver_earnings: driverEarnings } };
   }
 
@@ -1525,21 +1563,11 @@ async function driverTripAction(driver, tripId, action, body = {}) {
 
 app.post('/api/v1/trips/estimate', async (req, reply) => {
   const body = validate(schemas.requestRide, req.body);
-
-  const pricing = await AI.price({
-    pickup_lat: body.pickup_lat,
-    pickup_lng: body.pickup_lng,
-    dropoff_lat: body.dropoff_lat,
-    dropoff_lng: body.dropoff_lng,
-    service_type: body.service_type,
-  });
-
-  return reply.send({
-    price_estimate: pricing,
-    currency: 'USD',
-  });
+  if (body.scheduled_for) throw unavailable('Scheduled rides are not available yet. Please request when you are ready.', 400);
+  const pricing = await AI.price(body);
+  const token = app.jwt.sign({ type: 'ride_quote', jti: uuidv4(), fingerprint: bookingFingerprint(body), pricing }, { expiresIn: '5m' });
+  return reply.send({ price_estimate: pricing, currency: pricing.currency, quote_token: token, expires_at: new Date(Date.now() + 300000).toISOString() });
 });
-
 
 // Create trip request
 app.post('/api/v1/trips', { preHandler: [authenticate, requireDatabase, idempotencyGuard] }, async (req, reply) => {
@@ -1548,33 +1576,30 @@ app.post('/api/v1/trips', { preHandler: [authenticate, requireDatabase, idempote
   const tripId = uuidv4();
   const tripNumber = `TRP-${Date.now()}-${randomDigits(3)}`;
 
-  // Only one open trip per rider
-  const { rows: open } = await query(
-    "SELECT id FROM trips WHERE customer_id = $1 AND status IN ('requested','searching','accepted','driver_en_route','arrived','in_progress') LIMIT 1",
-    [customerId]
-  );
-  if (open.length) {
-    return reply.code(409).send({ error: 'You already have an active trip', trip_id: open[0].id });
+  if (req.user.role !== 'customer') return reply.code(403).send({ error: 'Customer account required' });
+  if (body.scheduled_for) throw unavailable('Scheduled rides are not available yet. Please request when you are ready.', 400);
+  const quote = body.quote_token ? readQuote(body.quote_token, body) : null;
+  const pricing = quote?.pricing || await AI.price(body);
+  if (body.payment_method === 'card') {
+    if (!quote) throw unavailable('Please check the fare before authorizing your card.', 400);
+    await payments.verifyAuthorization(customerId, body.payment_intent_id, quote);
   }
-
-  const pricing = await AI.price({
-    pickup_lat: body.pickup_lat,
-    pickup_lng: body.pickup_lng,
-    dropoff_lat: body.dropoff_lat,
-    dropoff_lng: body.dropoff_lng,
-    service_type: body.service_type,
-  });
   const pickupOtp = randomDigits(4);
 
-  const { rows: [trip] } = await query(`
+  const trip = await transaction(async client => {
+    // Serialize booking per customer to prevent two concurrent active rides.
+    await client.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [customerId]);
+    const { rows: open } = await client.query("SELECT id FROM trips WHERE customer_id=$1 AND status IN ('requested','searching','accepted','driver_en_route','arrived','in_progress') LIMIT 1", [customerId]);
+    if (open.length) throw unavailable('You already have an active trip. Open your current ride.', 409);
+    const { rows: [trip] } = await client.query(`
     INSERT INTO trips (
       id, trip_number, customer_id, service_type, vehicle_type_requested,
       pickup_lat, pickup_lng, pickup_address,
       dropoff_lat, dropoff_lng, dropoff_address,
       passengers, scheduled_for,
       base_fare, distance_fare, time_fare, surge_multiplier, total_fare, estimated_fare,
-      currency, status, platform, payment_method, pickup_otp
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
+      currency, status, platform, payment_method, pickup_otp, route_geometry, route_source, route_duration_minutes, route_distance_km, stripe_payment_intent_id
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29)
     RETURNING *
   `, [
     tripId, tripNumber, customerId, body.service_type, body.vehicle_type || null,
@@ -1583,15 +1608,24 @@ app.post('/api/v1/trips', { preHandler: [authenticate, requireDatabase, idempote
     body.passengers, body.scheduled_for || null,
     pricing.breakdown?.base_fare, pricing.breakdown?.distance_fare, pricing.breakdown?.time_fare,
     pricing.surge_multiplier, pricing.total_fare, pricing.total_fare,
-    'USD', 'requested', req.headers['x-platform'] || 'web', body.payment_method, pickupOtp
+    pricing.currency, 'requested', req.headers['x-platform'] || 'web', body.payment_method, pickupOtp,
+    pricing.route?.geometry || null, pricing.route?.source || null, pricing.route?.duration_minutes || null, pricing.route?.distance_km || null, body.payment_method === 'card' ? body.payment_intent_id : null
   ]);
+
+    if (body.payment_method === 'card') {
+      const attached = await client.query('UPDATE booking_payments SET trip_id=$1 WHERE intent_id=$2 AND customer_id=$3 AND trip_id IS NULL AND expires_at>NOW() RETURNING intent_id', [trip.id, body.payment_intent_id, customerId]);
+      if (attached.rowCount !== 1) throw unavailable('This payment authorization has expired or is already used.', 409);
+      await client.query("UPDATE trips SET payment_status='authorized' WHERE id=$1", [trip.id]);
+    }
+    return trip;
+  });
 
   // Match a driver in the background; the sweeper keeps retrying until the dispatch timeout.
   if (!trip.scheduled_for || new Date(trip.scheduled_for).getTime() - Date.now() < 10 * 60 * 1000) {
-    dispatchTrip(trip.id).catch((err) => logger.error({ err, tripId: trip.id }, 'Dispatch failed'));
+    await dispatchTrip(trip.id);
   }
 
-  io.to(`user:${customerId}`).emit('trip:created', { trip_id: tripId, status: 'searching' });
+  await emitEvent(`user:${customerId}`, 'trip:created', { trip_id: tripId, status: 'searching' });
   logger.info({ tripId, customerId }, 'Trip request created');
 
   return reply.code(201).send({
@@ -1612,13 +1646,14 @@ app.post('/api/v1/trips', { preHandler: [authenticate, requireDatabase, idempote
 
 // Get trip details
 app.get('/api/v1/trips/:tripId', { preHandler: [authenticate, requireDatabase] }, async (req, reply) => {
+  if (runtime.edge) await sweepDispatch();
   if (!UUID_RE.test(req.params.tripId)) return reply.code(404).send({ error: 'Trip not found' });
   const { rows: [trip] } = await query(`
     SELECT t.*,
       u.first_name || ' ' || u.last_name as driver_name,
       u.phone as driver_phone,
       u.avatar_url as driver_avatar,
-      d.rating_overall as driver_rating,
+      d.rating_overall as driver_rating, d.location_updated_at as driver_location_updated_at,
       ST_Y(d.current_location::geometry) as driver_lat,
       ST_X(d.current_location::geometry) as driver_lng,
       v.make, v.model, v.color, v.plate_number
@@ -1637,6 +1672,7 @@ app.get('/api/v1/trips/:tripId', { preHandler: [authenticate, requireDatabase] }
 
   // The pickup OTP belongs to the rider; never reveal it to the driver or ops.
   if (trip.customer_id !== req.user.id) delete trip.pickup_otp;
+  if (!trip.driver_location_updated_at || Date.now()-new Date(trip.driver_location_updated_at).getTime()>120000 || ['completed','cancelled','failed'].includes(trip.status)) { trip.driver_lat=null; trip.driver_lng=null; }
   return reply.send({ trip });
 });
 
@@ -1656,7 +1692,7 @@ app.post('/api/v1/trips/:tripId/cancel', { preHandler: [authenticate, requireDat
     return reply.code(400).send({ error: `Cannot cancel trip in '${trip.status}' status` });
   }
 
-  const cancellationFee = ['driver_en_route', 'arrived'].includes(trip.status) ? 3.00 : 0;
+  const cancellationFee = 0;
 
   const { rowCount } = await query(`
     UPDATE trips SET
@@ -1668,8 +1704,9 @@ app.post('/api/v1/trips/:tripId/cancel', { preHandler: [authenticate, requireDat
   `, [String(req.body?.reason || 'Customer cancelled').slice(0, 500), trip.id, trip.status]);
   if (rowCount !== 1) return reply.code(409).send({ error: 'Trip status changed; please retry' });
 
+  if (trip.stripe_payment_intent_id) await jobs.enqueue('cancel_authorization', `cancel:${trip.stripe_payment_intent_id}`, { intent_id: trip.stripe_payment_intent_id });
   if (trip.driver_id) {
-    io.to(`driver:${trip.driver_id}`).emit('trip:cancelled', { trip_id: trip.id });
+    await emitEvent(`driver:${trip.driver_id}`, 'trip:cancelled', { trip_id: trip.id });
     await releaseDriver(trip.driver_id);
     await query('UPDATE drivers SET cancelled_trips = cancelled_trips + 1 WHERE id = $1', [trip.driver_id]);
   }
@@ -1778,7 +1815,7 @@ async function dispatchDelivery(deliveryId) {
         "UPDATE deliveries SET status = 'cancelled', failed_reason = 'No driver available' WHERE id = $1 AND status = 'pending' AND driver_id IS NULL",
         [delivery.id]
       );
-      if (rowCount) io.to(`user:${delivery.customer_id}`).emit('delivery:dispatch_failed', { delivery_id: delivery.id });
+      if (rowCount) await emitEvent(`user:${delivery.customer_id}`, 'delivery:dispatch_failed', { delivery_id: delivery.id });
     }
     return;
   }
@@ -1807,7 +1844,7 @@ async function dispatchDelivery(deliveryId) {
       await releaseDriver(driverId);
       return;
     }
-    io.to(`driver:${driverId}`).emit('delivery:new_request', {
+    await emitEvent(`driver:${driverId}`, 'delivery:new_request', {
       delivery_id: delivery.id,
       pickup_address: delivery.pickup_address,
       dropoff_address: delivery.dropoff_address,
@@ -1838,7 +1875,7 @@ async function driverDeliveryAction(driver, deliveryId, action, body = {}) {
   if (action === 'accept') {
     if (d.status !== 'pending') return bad();
     await query("UPDATE deliveries SET status = 'pickup_scheduled' WHERE id = $1 AND status = 'pending'", [d.id]);
-    io.to(`user:${d.customer_id}`).emit('delivery:driver_assigned', { delivery_id: d.id });
+    await emitEvent(`user:${d.customer_id}`, 'delivery:driver_assigned', { delivery_id: d.id });
     return { code: 200, body: { message: 'Delivery accepted', status: 'pickup_scheduled' } };
   }
 
@@ -1846,7 +1883,7 @@ async function driverDeliveryAction(driver, deliveryId, action, body = {}) {
     if (d.status !== 'pickup_scheduled') return bad();
     if (!body.otp || String(body.otp) !== String(d.pickup_otp).trim()) return { code: 403, body: { error: 'Invalid pickup OTP' } };
     await query("UPDATE deliveries SET status = 'in_transit', picked_up_at = NOW() WHERE id = $1 AND status = 'pickup_scheduled'", [d.id]);
-    io.to(`user:${d.customer_id}`).emit('delivery:picked_up', { delivery_id: d.id });
+    await emitEvent(`user:${d.customer_id}`, 'delivery:picked_up', { delivery_id: d.id });
     return { code: 200, body: { message: 'Pickup confirmed', status: 'in_transit' } };
   }
 
@@ -1856,22 +1893,54 @@ async function driverDeliveryAction(driver, deliveryId, action, body = {}) {
     const fare = Number(d.total_fare);
     const platformFee = Number((fare * PLATFORM_FEE_RATE).toFixed(2));
     const driverEarnings = Number((fare - platformFee).toFixed(2));
+
+    const pod = schemas.proofOfDelivery.safeParse(body);
+    if (!pod.success) return { code: 400, body: { error: 'Invalid proof of delivery', details: pod.error.issues.map(i => i.message) } };
+    const podSignature = pod.data.pod_signature || null;
+    const podPhotoUrl = pod.data.pod_photo_url || null;
+    const podRecipientName = pod.data.recipient_name || d.dropoff_contact_name || 'Recipient';
+
     const ok = await transaction(async (client) => {
       const { rowCount } = await client.query(`
-        UPDATE deliveries SET status = 'delivered', delivered_at = NOW(), platform_fee = $1, driver_earnings = $2
+        UPDATE deliveries SET
+          status = 'delivered',
+          delivered_at = NOW(),
+          platform_fee = $1,
+          driver_earnings = $2,
+          dropoff_signature_url = COALESCE($4, dropoff_signature_url),
+          dropoff_photo_url = COALESCE($5, dropoff_photo_url),
+          dropoff_recipient_name = $6
         WHERE id = $3 AND status IN ('in_transit','out_for_delivery')
-      `, [platformFee, driverEarnings, d.id]);
+      `, [platformFee, driverEarnings, d.id, podSignature, podPhotoUrl, podRecipientName]);
       if (rowCount !== 1) return false;
       await client.query(`
         UPDATE drivers SET total_trips = total_trips + 1, completed_trips = completed_trips + 1,
-          total_earnings = total_earnings + $1, pending_payout = pending_payout + $1, status = 'available'
+          total_earnings = total_earnings + $1, status = 'available'
         WHERE id = $2
       `, [driverEarnings, driver.id]);
       return true;
     });
     if (!ok) return bad();
-    io.to(`user:${d.customer_id}`).emit('delivery:delivered', { delivery_id: d.id });
-    return { code: 200, body: { message: 'Delivery completed', status: 'delivered', driver_earnings: driverEarnings } };
+    await emitEvent(`user:${d.customer_id}`, 'delivery:delivered', {
+      delivery_id: d.id,
+      recipient_name: podRecipientName,
+      has_signature: !!podSignature,
+      has_photo: !!podPhotoUrl
+    });
+    return {
+      code: 200,
+      body: {
+        message: 'Delivery completed with Proof-of-Delivery',
+        status: 'delivered',
+        driver_earnings: driverEarnings,
+        pod: {
+          recipient_name: podRecipientName,
+          signature_captured: !!podSignature,
+          photo_captured: !!podPhotoUrl,
+          completed_at: new Date().toISOString()
+        }
+      }
+    };
   }
 
   return { code: 400, body: { error: 'Unknown action' } };
@@ -1929,7 +1998,7 @@ app.post('/api/v1/deliveries', { preHandler: [authenticate, requireDatabase, ide
     body.pickup_contact_name, body.pickup_contact_phone, body.pickup_lat, body.pickup_lng, body.pickup_address,
     body.pickup_window_start || null, body.pickup_window_end || null, pickupOtp,
     body.dropoff_contact_name, body.dropoff_contact_phone, body.dropoff_lat, body.dropoff_lng, body.dropoff_address,
-    dropoffOtp, `https://track.nexuslogistics.ai/${trackingSlug}`,
+    dropoffOtp, `${getEnv('PUBLIC_APP_URL', 'http://localhost:3000').replace(/\/$/, '')}/track/${trackingSlug}`,
     body.cargo_description, body.cargo_weight_kg, body.cargo_length_cm ?? null, body.cargo_width_cm ?? null, body.cargo_height_cm ?? null,
     body.cargo_value ?? null, body.is_fragile, body.requires_refrigeration, body.temp_min_celsius ?? null, body.temp_max_celsius ?? null,
     body.insurance_requested, insurancePremium,
@@ -1937,7 +2006,7 @@ app.post('/api/v1/deliveries', { preHandler: [authenticate, requireDatabase, ide
     totalFare, 'USD', 'pending'
   ]);
 
-  dispatchDelivery(delivery.id).catch((err) => logger.error({ err, deliveryId: delivery.id }, 'Delivery dispatch failed'));
+  await dispatchDelivery(delivery.id);
 
   logger.info({ deliveryId, customerId: req.user.id }, 'Delivery request created');
 
@@ -1987,36 +2056,107 @@ app.post('/api/v1/deliveries/:id/cancel', { preHandler: [authenticate, requireDa
   if (rowCount !== 1) return reply.code(409).send({ error: 'Delivery status changed; please retry' });
   if (d.driver_id) {
     await releaseDriver(d.driver_id);
-    io.to(`driver:${d.driver_id}`).emit('delivery:cancelled', { delivery_id: d.id });
+    await emitEvent(`driver:${d.driver_id}`, 'delivery:cancelled', { delivery_id: d.id });
   }
   return reply.send({ message: 'Delivery cancelled' });
 });
 
-// Track delivery (public endpoint)
+// Track delivery or trip (public endpoint)
+// Public tracking. With a database, only the unguessable tracking slug works: delivery
+// numbers are sequential and ids are internal. Without one, the demo shipments are
+// reachable by their demo id so the page can be previewed.
+const TRACK_SLUG_RE = /^[a-f0-9]{24}$/;
+
+function demoTrackingRecord(id) {
+  const mem = inMemoryStore.deliveries.find(d => d.id === id);
+  if (!mem) return null;
+  const cc = inMemoryStore.coldChainShipments.find(s => s.id === id);
+  return {
+    delivery_number: mem.id,
+    status: mem.status,
+    cargo_description: cc?.cargo || (mem.type === 'cold_chain' ? 'Temperature-sensitive cargo' : 'Commercial goods'),
+    pickup_address: mem.from,
+    dropoff_address: mem.to,
+    pickup_lat: 40.7895, pickup_lng: -74.0565,
+    dropoff_lat: 40.7397, dropoff_lng: -73.9754,
+    current_lat: 40.7580, current_lng: -73.9855,
+    current_temp_celsius: cc?.current_temp_c ?? mem.current_temp_c ?? null,
+    temp_min_celsius: cc?.min_temp_c ?? null,
+    temp_max_celsius: cc?.max_temp_c ?? null,
+    temp_alerts_count: cc && cc.status !== 'NORMAL' ? 1 : 0,
+    requires_refrigeration: mem.type === 'cold_chain',
+    estimated_delivery_at: new Date(Date.now() + 28 * 60000).toISOString(),
+    delivered_at: null,
+    driver_first_name: mem.driver ? mem.driver.split(' ')[0] : null,
+    make: null, model: mem.vehicle || null, plate_number: cc?.plate || null,
+    progress_pct: mem.progress_pct ?? null,
+    sensor_battery_pct: cc ? parseInt(cc.battery, 10) : null,
+    is_demo: true,
+  };
+}
+
+async function findTrackedDelivery(slug) {
+  if (dbConnected) {
+    if (!TRACK_SLUG_RE.test(slug)) return null;
+    const { rows: [d] } = await query(`
+      SELECT
+        d.delivery_number, d.status, d.cargo_description,
+        d.pickup_address, d.dropoff_address,
+        d.pickup_lat, d.pickup_lng, d.dropoff_lat, d.dropoff_lng,
+        d.current_lat, d.current_lng, d.current_temp_celsius,
+        d.temp_min_celsius, d.temp_max_celsius, d.temp_alerts_count, d.requires_refrigeration,
+        d.estimated_delivery_at, d.picked_up_at, d.delivered_at, d.created_at,
+        (d.dropoff_signature_url IS NOT NULL) AS signature_captured,
+        u.first_name as driver_first_name,
+        v.make, v.model, v.plate_number
+      FROM deliveries d
+      LEFT JOIN drivers dr ON d.driver_id = dr.id
+      LEFT JOIN users u ON dr.user_id = u.id
+      LEFT JOIN LATERAL (
+        SELECT make, model, plate_number FROM vehicles WHERE driver_id = dr.id AND is_active ORDER BY created_at LIMIT 1
+      ) v ON TRUE
+      WHERE d.tracking_url = $1 OR d.tracking_url LIKE $2
+    `, [`${getEnv('PUBLIC_APP_URL', 'http://localhost:3000').replace(/\/$/, '')}/track/${slug}`, `%/${slug}`]);
+    return d ? { ...d, is_demo: false } : null;
+  }
+  return demoTrackingRecord(slug);
+}
+
+// Temperature status from what telemetry actually records: the latest reading and how
+// many readings fell outside the range. There is no reading history, so no time-based
+// excursion budget or mean kinetic temperature is claimed.
+function temperatureSummary(d) {
+  if (!d.requires_refrigeration) return null;
+  const min = d.temp_min_celsius != null ? Number(d.temp_min_celsius) : null;
+  const max = d.temp_max_celsius != null ? Number(d.temp_max_celsius) : null;
+  const current = d.current_temp_celsius != null ? Number(d.current_temp_celsius) : null;
+  const excursions = Number(d.temp_alerts_count || 0);
+  const inRange = current == null || min == null || max == null ? null : current >= min && current <= max;
+  return {
+    current_c: current,
+    min_c: min,
+    max_c: max,
+    in_range: inRange,
+    excursion_readings: excursions,
+    status: current == null ? 'NO_DATA' : inRange === false ? 'OUT_OF_RANGE' : excursions > 0 ? 'RECOVERED' : 'IN_RANGE',
+  };
+}
+
 app.get('/api/v1/track/:slug', async (req, reply) => {
-  const trackingUrl = `https://track.nexuslogistics.ai/${req.params.slug}`;
-
-  const { rows: [delivery] } = await query(`
-    SELECT
-      d.delivery_number, d.status, d.cargo_description,
-      d.pickup_address, d.dropoff_address,
-      d.current_lat, d.current_lng, d.current_temp_celsius,
-      d.estimated_delivery_at, d.delivered_at,
-      u.first_name as driver_first_name,
-      v.make, v.model, v.plate_number
-    FROM deliveries d
-    LEFT JOIN drivers dr ON d.driver_id = dr.id
-    LEFT JOIN users u ON dr.user_id = u.id
-    LEFT JOIN LATERAL (
-      SELECT make, model, plate_number FROM vehicles WHERE driver_id = dr.id AND is_active ORDER BY created_at LIMIT 1
-    ) v ON TRUE
-    WHERE d.tracking_url = $1
-  `, [trackingUrl]);
-
+  const delivery = await findTrackedDelivery(req.params.slug);
   if (!delivery) return reply.code(404).send({ error: 'Tracking not found' });
-
-  return reply.send({ delivery });
+  return reply.send({ delivery: { ...delivery, temperature: temperatureSummary(delivery) } });
 });
+
+// Shareable tracking link: /track/<slug> serves the tracking page, which reads the slug from the path.
+if (!runtime.edge) {
+const trackPagePath = path.join(__dirname, 'frontend', 'track.html');
+app.get('/track/:slug', async (req, reply) => {
+  const html = await fs.promises.readFile(trackPagePath);
+  return reply.type('text/html; charset=utf-8').send(html);
+});
+
+}
 
 // ------------------------------------------------------------
 // Dispatch sweeper: retries unmatched jobs, expires unanswered offers.
@@ -2211,8 +2351,8 @@ app.post('/api/v1/cold-chain/telemetry', { preHandler: telemetryGuard }, async (
     inMemoryStore.alerts.unshift(alert);
     if (inMemoryStore.alerts.length > 20) inMemoryStore.alerts.pop();
 
-    io.to('ops:alerts').emit('cold_chain:alert', alert);
-    if (delivery) io.to(`user:${delivery.customer_id}`).emit('delivery:temperature_alert', { delivery_id: delivery.id, temperature_c: body.temperature_c });
+    await emitEvent('ops:alerts', 'cold_chain:alert', alert);
+    if (delivery) await emitEvent(`user:${delivery.customer_id}`, 'delivery:temperature_alert', { delivery_id: delivery.id, temperature_c: body.temperature_c });
   }
 
   if (delivery) {
@@ -2258,6 +2398,33 @@ app.get('/api/v1/cold-chain/shipments', { preHandler: opsGuard }, async (req, re
     total_monitored: shipments.length,
     active_excursions: shipments.filter(s => s.status !== 'NORMAL').length,
     timestamp: new Date().toISOString()
+  });
+});
+
+// Cold-chain compliance & stability audit report (public / verified)
+// Temperature summary for a tracked shipment. Public, so it is keyed by the tracking slug
+// like /track. It reports recorded readings only; it is not a regulatory release certificate.
+app.get('/api/v1/track/:slug/temperature-report', async (req, reply) => {
+  const delivery = await findTrackedDelivery(req.params.slug);
+  if (!delivery) return reply.code(404).send({ error: 'Tracking not found' });
+  const temperature = temperatureSummary(delivery);
+  if (!temperature) return reply.code(404).send({ error: 'This shipment is not temperature-controlled' });
+
+  const verdict = temperature.status === 'NO_DATA' ? 'NO_DATA'
+    : temperature.status === 'OUT_OF_RANGE' ? 'OUT_OF_RANGE_NOW'
+    : temperature.excursion_readings > 0 ? 'REVIEW_EXCURSIONS'
+    : 'ALL_READINGS_IN_RANGE';
+
+  return reply.send({
+    report_id: `TR-${delivery.delivery_number}`,
+    delivery_number: delivery.delivery_number,
+    cargo_description: delivery.cargo_description,
+    status: delivery.status,
+    temperature,
+    verdict,
+    delivered_at: delivery.delivered_at || null,
+    generated_at: new Date().toISOString(),
+    is_demo: delivery.is_demo,
   });
 });
 
@@ -2337,14 +2504,14 @@ app.post('/api/v1/driver/location', { preHandler: [authenticate, requireDatabase
     [driverId]
   );
   for (const { customer_id } of activeTrips) {
-    io.to(`user:${customer_id}`).emit('driver:location', { lat, lng, heading, speed_kmh });
+    await emitEvent(`user:${customer_id}`, 'driver:location', { lat, lng, heading, speed_kmh });
   }
   const { rows: activeDeliveries } = await query(
     "UPDATE deliveries SET current_lat = $2, current_lng = $3 WHERE driver_id = $1 AND status IN ('pickup_scheduled','in_transit','out_for_delivery') RETURNING customer_id",
     [driverId, lat, lng]
   );
   for (const { customer_id } of activeDeliveries) {
-    io.to(`user:${customer_id}`).emit('driver:location', { lat, lng, heading, speed_kmh });
+    await emitEvent(`user:${customer_id}`, 'driver:location', { lat, lng, heading, speed_kmh });
   }
 
   return reply.send({ received: true });
@@ -2400,6 +2567,7 @@ app.get('/api/v1/driver/earnings', { preHandler: [authenticate, requireDatabase,
 
 // Current job(s): lets mobile clients poll instead of relying on a socket for offers.
 app.get('/api/v1/driver/jobs/current', { preHandler: [authenticate, requireDatabase, requireDriver] }, async (req, reply) => {
+  if (runtime.edge) await sweepDispatch();
   const { rows: trips } = await query(`
     SELECT id, trip_number, status, pickup_address, pickup_lat, pickup_lng, dropoff_address, dropoff_lat, dropoff_lng, total_fare, driver_assigned_at
     FROM trips WHERE driver_id = $1 AND status IN ('accepted','driver_en_route','arrived','in_progress')
@@ -2409,7 +2577,7 @@ app.get('/api/v1/driver/jobs/current', { preHandler: [authenticate, requireDatab
            cargo_description, cargo_weight_kg, total_fare
     FROM deliveries WHERE driver_id = $1 AND status IN ('pending','pickup_scheduled','in_transit','out_for_delivery')
   `, [req.driver.id]);
-  return reply.send({ trips, deliveries, respond_within_sec: driverResponseTimeoutMs / 1000 });
+  return reply.send({ trips, deliveries, driver: { status:req.driver.status, is_online:req.driver.is_online, onboarding_completed:req.driver.onboarding_completed }, respond_within_sec: driverResponseTimeoutMs / 1000 });
 });
 
 for (const action of ['accept', 'decline', 'arrive', 'start', 'complete']) {
@@ -2434,7 +2602,7 @@ app.post('/api/v1/driver/mode', { preHandler: [authenticate, requireDatabase, re
   await query('UPDATE drivers SET service_types = $1::service_type[] WHERE id = $2', [SERVICE_BY_MODE[mode], req.driver.id]);
 
   const event = { driver_id: req.driver.id, mode, timestamp: new Date().toISOString() };
-  io.to('ops:fleet').emit('fleet:mode_updated', event);
+  await emitEvent('ops:fleet', 'fleet:mode_updated', event);
   return reply.send({ success: true, ...event });
 });
 
@@ -2551,8 +2719,8 @@ app.post('/api/v1/fleet/rebalance', { preHandler: opsGuard }, async (req, reply)
   inMemoryStore.alerts.unshift(alert);
   if (inMemoryStore.alerts.length > 20) inMemoryStore.alerts.pop();
 
-  io.to('ops:fleet').emit('fleet:rebalanced', rebalanceData);
-  io.to('ops:alerts').emit('ops:alert', alert);
+  await emitEvent('ops:fleet', 'fleet:rebalanced', rebalanceData);
+  await emitEvent('ops:alerts', 'ops:alert', alert);
 
   return reply.send(rebalanceData);
 });
@@ -2563,18 +2731,8 @@ app.post('/api/v1/fleet/rebalance', { preHandler: opsGuard }, async (req, reply)
 
 app.post('/api/v1/payments/setup-intent', { preHandler: [authenticate, requireDatabase, idempotencyGuard] }, async (req, reply) => {
   try {
-    // Reuse the Stripe customer so repeated calls do not create duplicates.
-    const { rows: [row] } = await query('SELECT stripe_customer_id FROM users WHERE id = $1', [req.user.id]);
-    let customerId = row?.stripe_customer_id;
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: req.user.email,
-        name: `${req.user.first_name} ${req.user.last_name}`,
-        metadata: { nexus_user_id: req.user.id }
-      });
-      customerId = customer.id;
-      await query('UPDATE users SET stripe_customer_id = $1 WHERE id = $2', [customerId, req.user.id]);
-    }
+    if (!cardsEnabled) throw unavailable('Card payments are currently unavailable. Please choose cash.');
+    const customerId = await payments.customer(req.user);
 
     const setupIntent = await stripe.setupIntents.create({
       customer: customerId,
@@ -2617,7 +2775,7 @@ app.register(async (instance) => {
 
     let event;
     try {
-      event = stripe.webhooks.constructEvent(
+      event = await stripe.webhooks.constructEventAsync(
         req.rawBody,
         signature,
         config.stripe.webhookSecret
@@ -2626,75 +2784,13 @@ app.register(async (instance) => {
       return reply.code(400).send({ error: 'Invalid signature' });
     }
 
-    const insertResult = await query(
-      `INSERT INTO stripe_webhook_events (event_id, event_type, payload, signature)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (event_id) DO NOTHING
-       RETURNING event_id`,
-      [event.id, event.type, event, signature]
-    );
-
-    // Stripe may retry already-processed events. Acknowledge duplicates safely.
-    if (insertResult.rowCount === 0) {
-      await query(
-        `UPDATE stripe_webhook_events
-         SET delivery_attempt = delivery_attempt + 1, received_at = NOW()
-         WHERE event_id = $1`,
-        [event.id]
-      );
-      return reply.send({ received: true, duplicate: true });
-    }
-  
-    try {
-      switch (event.type) {
-        case 'payment_intent.succeeded': {
-          const pi = event.data.object;
-          await query(
-            "UPDATE payments SET status = 'captured', captured_at = NOW() WHERE gateway_ref = $1",
-            [pi.id]
-          );
-          logger.info({ paymentId: pi.id }, 'Payment captured');
-          break;
-        }
-        case 'payment_intent.payment_failed': {
-          const pi = event.data.object;
-          await query(
-            "UPDATE payments SET status = 'failed', failed_at = NOW() WHERE gateway_ref = $1",
-            [pi.id]
-          );
-          break;
-        }
-        case 'charge.dispute.created': {
-          const dispute = event.data.object;
-          logger.warn({ dispute }, 'Payment dispute created');
-          // Auto-flag for review
-          await query(
-            "UPDATE payments SET status = 'disputed' WHERE gateway_ref = $1",
-            [dispute.charge]
-          );
-          break;
-        }
-        default:
-          logger.info({ eventId: event.id, type: event.type }, 'Unhandled Stripe webhook type');
-      }
-
-      await query(
-        `UPDATE stripe_webhook_events
-         SET processed_at = NOW(), processing_error = NULL
-         WHERE event_id = $1`,
-        [event.id]
-      );
-    } catch (err) {
-      await query(
-        `UPDATE stripe_webhook_events
-         SET processing_error = $2
-         WHERE event_id = $1`,
-        [event.id, err.message || 'Webhook processing failed']
-      );
-      throw err;
-    }
-  
-    return reply.send({ received: true });
+    const duplicate = await transaction(async client => {
+      const inserted = await client.query(`INSERT INTO stripe_webhook_events(event_id,event_type,payload,signature)
+        VALUES($1,$2,$3,$4) ON CONFLICT(event_id) DO UPDATE SET delivery_attempt=stripe_webhook_events.delivery_attempt+1 RETURNING delivery_attempt`, [event.id,event.type,event,signature]);
+      await jobs.enqueue('stripe_event', `stripe:${event.id}`, { event_id: event.id }, client);
+      return inserted.rows[0].delivery_attempt > 1;
+    });
+    return reply.send({ received: true, duplicate });
   });
 });
 
@@ -2802,7 +2898,7 @@ app.get('/api/v1/ops/overview', { preHandler: opsGuard }, async (req, reply) => 
       demo: true,
       status: 'ONLINE',
       version: '3.0.0',
-      platform: 'NEXUS LOGISTICS GROUP',
+      platform: 'NEXORA LOGISTICS GROUP',
       metrics: {
         active_trips: inMemoryStore.trips.filter(t => t.status !== 'completed').length,
         active_deliveries: inMemoryStore.deliveries.filter(d => d.status !== 'delivered').length,
@@ -2842,6 +2938,7 @@ app.get('/api/v1/ops/overview', { preHandler: opsGuard }, async (req, reply) => 
         (SELECT COALESCE(SUM(platform_fee), 0) FROM trips WHERE status = 'completed' AND trip_completed_at::date = CURRENT_DATE)
           + (SELECT COALESCE(SUM(platform_fee), 0) FROM deliveries WHERE status = 'delivered' AND delivered_at::date = CURRENT_DATE) AS today_profit,
         (SELECT AVG(initial_eta_pickup_min) FROM trips WHERE created_at::date = CURRENT_DATE AND initial_eta_pickup_min IS NOT NULL) AS avg_eta,
+        (SELECT AVG(customer_rating) FROM trips WHERE customer_rating IS NOT NULL) AS avg_rating,
         (SELECT AVG(dispatch_ai_score) * 100 FROM trips WHERE created_at::date = CURRENT_DATE AND dispatch_ai_score IS NOT NULL) AS ai_score
     `),
     query(`
@@ -2868,18 +2965,25 @@ app.get('/api/v1/ops/overview', { preHandler: opsGuard }, async (req, reply) => 
   const s = stats.rows[0];
   const online = drivers.filter(d => d.is_online);
   const shipments = cold;
+  const liveAlerts = runtime.edge ? (await query("SELECT payload FROM nexora_private.events WHERE audience='ops:alerts' AND event IN ('ops:alert','cold_chain:alert') AND created_at>NOW()-INTERVAL '1 day' ORDER BY id DESC LIMIT 10")).rows.map(row => row.payload) : inMemoryStore.alerts.slice(0,10);
+  const { rows: stalledJobs } = await query("SELECT kind,COUNT(*) AS total FROM background_jobs WHERE completed_at IS NULL AND (attempts>=12 OR (attempts>0 AND available_at<NOW()-INTERVAL '5 minutes')) GROUP BY kind");
+  for (const job of stalledJobs) liveAlerts.unshift({type:'critical',title:`${job.total} ${job.kind.replaceAll('_',' ')} job(s) need attention`,desc:'Inspect the background job queue and integration settings before retrying.'});
+  const { rows: blockedSettlements } = await query("SELECT COUNT(*) AS total FROM trips WHERE payment_status IN ('refunded','disputed')");
+  if (Number(blockedSettlements[0].total)) liveAlerts.unshift({type:'critical',title:'Payment settlements need review',desc:'Refunds or disputes affected driver settlements. Review and reverse any affected transfers in Stripe.'});
+
 
   return reply.send({
     demo: false,
     status: 'ONLINE',
     version: '3.0.0',
-    platform: 'NEXUS LOGISTICS GROUP',
+    platform: 'NEXORA LOGISTICS GROUP',
     metrics: {
       active_trips: Number(s.active_trips),
       active_deliveries: Number(s.active_deliveries),
       completed_today: Number(s.completed_today),
       today_revenue: Number(s.today_revenue),
       today_profit: Number(s.today_profit),
+      avg_rating: s.avg_rating == null ? null : Number(s.avg_rating),
       avg_eta_minutes: s.avg_eta === null ? null : Number(Number(s.avg_eta).toFixed(1)),
       dispatch_ai_score_pct: s.ai_score === null ? null : Number(Number(s.ai_score).toFixed(1)),
       deadhead_reduction_pct: null,
@@ -2899,16 +3003,31 @@ app.get('/api/v1/ops/overview', { preHandler: opsGuard }, async (req, reply) => 
     diurnal: { current_hour: currentHour, state: diurnalState(currentHour) },
     trips: trips.rows,
     deliveries: deliveries.rows,
-    alerts: inMemoryStore.alerts.slice(0, 10),
+    alerts: liveAlerts,
     timestamp: new Date().toISOString()
   });
 });
+
+if (runtime.edge) {
+  app.get('/api/v1/events', { preHandler: [authenticate, requireDatabase] }, async (req, reply) => {
+    const cursor = String(req.query.after || '0');
+    if (!/^\d{1,19}$/.test(cursor) || BigInt(cursor) > 9223372036854775807n) return reply.code(400).send({ error:'Invalid event cursor' });
+    const rooms = [`user:${req.user.id}`];
+    if (['ops', 'admin'].includes(req.user.role)) rooms.push('ops:alerts', 'ops:fleet');
+    if (req.user.role === 'driver') {
+      const { rows: [driver] } = await query('SELECT id FROM drivers WHERE user_id=$1', [req.user.id]);
+      if (driver) rooms.push(`driver:${driver.id}`);
+    }
+    const { rows } = await query(`SELECT id::text, event, payload FROM nexora_private.events WHERE id > $1::bigint AND audience = ANY($2::text[]) AND created_at > NOW() - INTERVAL '1 day' ORDER BY id LIMIT 100`, [cursor, rooms]);
+    return reply.send({ events: rows, cursor: rows.length ? rows[rows.length - 1].id : cursor });
+  });
+}
 
 // ============================================================
 // REAL-TIME WEBSOCKET (Socket.io)
 // ============================================================
 
-const io = new SocketIO({
+const io = runtime.io || new SocketIO({
   cors: {
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);
@@ -2919,9 +3038,40 @@ const io = new SocketIO({
   },
 });
 
+const payments = createPayments({ app, query, transaction, stripe, jobs, enabled: cardsEnabled,
+  publicKey: getEnv('STRIPE_PUBLISHABLE_KEY', ''), appUrl: getEnv('PUBLIC_APP_URL', '').replace(/\/$/, ''),
+  connectCountry: getEnv('STRIPE_CONNECT_COUNTRY', ''), authenticate, requireDatabase, requireDriver, idempotencyGuard, readQuote });
+const notifications = createNotifications({ app, query, jobs, authenticate, requireDatabase,
+  publicKey: getEnv('VAPID_PUBLIC_KEY', ''), privateKey: getEnv('VAPID_PRIVATE_KEY', ''), subject: getEnv('VAPID_SUBJECT', ''), fetch: runtime.fetch });
+async function emitEvent(audience, event, payload) {
+  if (dbConnected) await notifications.enqueue(audience, event, payload);
+  io.to(audience).emit(event, payload);
+}
+async function processBackground(limit = 10) {
+  if (!dbConnected) return;
+  await notifications.sweep(limit);
+  await jobs.run(['stripe_event'], async job => {
+    const { rows: [row] } = await query('SELECT payload FROM stripe_webhook_events WHERE event_id=$1', [job.payload.event_id]);
+    if (row) { await payments.handleEvent(row.payload); await query('UPDATE stripe_webhook_events SET processed_at=NOW(),processing_error=NULL WHERE event_id=$1', [job.payload.event_id]); }
+  }, limit);
+  await payments.sweep(limit);
+}
+app.get('/api/v1/config', async () => ({ maps: maps.enabled, card_payments: cardsEnabled,
+  stripe_publishable_key: cardsEnabled ? getEnv('STRIPE_PUBLISHABLE_KEY', '') : null,
+  push_notifications: notifications.enabled, vapid_public_key: notifications.enabled ? getEnv('VAPID_PUBLIC_KEY', '') : null }));
+app.get('/api/v1/places/search', { preHandler: [authenticate], config: { rateLimit: { max: 20, timeWindow: 60000 } } }, async req => {
+  const q = String(req.query.q || '').trim();
+  if (q.length < 3 || q.length > 200) throw unavailable('Enter an address between 3 and 200 characters.', 400);
+  return { places: await maps.search(q) };
+});
+app.get('/api/v1/places/reverse', { preHandler: [authenticate] }, async req => {
+  const body = validate(z.object({ lat:z.coerce.number().min(-90).max(90), lng:z.coerce.number().min(-180).max(180) }), req.query);
+  return { place: await maps.reverse(body.lat,body.lng) };
+});
+
 function verifyAccessToken(token) {
   const decoded = app.jwt.verify(token);
-  if (decoded.type === 'refresh') throw new Error('refresh token is not an access token');
+  if (decoded.type) throw new Error('refresh token is not an access token');
   return decoded;
 }
 
@@ -3008,7 +3158,7 @@ io.on('connection', (socket) => {
       `, [`INC-${Date.now()}-${randomDigits(3)}`, trip.id, trip.driver_id, trip.customer_id,
           Number.isFinite(Number(lat)) ? Number(lat) : null, Number.isFinite(Number(lng)) ? Number(lng) : null]);
 
-      io.to('ops:alerts').emit('sos:emergency', { tripId, driverId: trip.driver_id, lat, lng, timestamp: new Date() });
+      await emitEvent('ops:alerts', 'sos:emergency', { tripId, driverId: trip.driver_id, lat, lng, timestamp: new Date() });
     } catch (err) {
       logger.error({ err, tripId }, 'SOS handling failed');
     }
@@ -3036,7 +3186,7 @@ io.on('connection', (socket) => {
 
 // Live fleet telemetry for operations dashboards (only computed while someone is listening).
 let heartbeatInFlight = false;
-setInterval(async () => {
+if (!runtime.edge) setInterval(async () => {
   const room = io.sockets.adapter.rooms.get('ops:fleet');
   if (!room || room.size === 0 || heartbeatInFlight) return;
   heartbeatInFlight = true;
@@ -3048,7 +3198,7 @@ setInterval(async () => {
       });
     }
     const { demo, drivers } = await getFleetSnapshot();
-    io.to('ops:fleet').emit('ops:heartbeat', { demo, drivers, timestamp: Date.now() });
+    await emitEvent('ops:fleet', 'ops:heartbeat', { demo, drivers, timestamp: Date.now() });
   } catch (err) {
     logger.error({ err }, 'Heartbeat failed');
   } finally {
@@ -3062,6 +3212,7 @@ setInterval(async () => {
 
 app.setErrorHandler((err, req, reply) => {
   // Client errors (validation, auth, rate limit) are safe to describe; server errors are not.
+  if (err.publicMessage) return reply.code(err.statusCode || 503).send({ error: err.publicMessage, request_id: req.requestId });
   if (err.statusCode && err.statusCode < 500) {
     return reply.code(err.statusCode).send({
       error: err.message,
@@ -3070,7 +3221,8 @@ app.setErrorHandler((err, req, reply) => {
     });
   }
   
-  logger.error({ requestId: req.requestId, err, url: req.url }, 'Unhandled error');
+  if (String(err.type || '').startsWith('Stripe')) { logger.error({requestId:req.requestId,type:err.type,code:err.code},'Payment provider error'); return reply.code(502).send({error:'The payment provider is temporarily unavailable. Please try again.'}); }
+  logger.error({ requestId: req.requestId, err, url: req.url.split('?')[0] }, 'Unhandled error');
   return reply.code(500).send({ error: 'Internal server error', request_id: req.requestId });
 });
 
@@ -3115,6 +3267,7 @@ async function start() {
       dbConnected = true;
       logger.info('✅ Database connected');
       await ensureOperationalTables();
+      await db.query(fs.readFileSync(path.join(__dirname,'supabase/migrations/20261019085513_booking_payments_notifications.sql'),'utf8'));
       logger.info('✅ Operational tables ensured');
       await bootstrapAdmin();
     } catch (e) {
@@ -3142,15 +3295,17 @@ async function start() {
     // Background workers
     setInterval(sweepDispatch, sweepIntervalMs).unref();
     setInterval(probeDatabase, 10000).unref();
+    let jobsBusy=false;
+    setInterval(async()=>{ if(jobsBusy)return; jobsBusy=true; try { await processBackground(); } catch(err) { logger.error({err},'Background jobs failed'); } finally { jobsBusy=false; } },2000).unref();
 
-    logger.info(`🚀 NEXUS LOGISTICS API running on port ${config.port}`);
+    logger.info(`🚀 NEXORA LOGISTICS API running on port ${config.port}`);
   } catch (err) {
     logger.error({ err }, 'Failed to start server');
     process.exit(1);
   }
 }
 
-process.on('unhandledRejection', (reason) => {
+if (!runtime.edge) process.on('unhandledRejection', (reason) => {
   logger.error({ reason }, 'Unhandled promise rejection');
 });
 
@@ -3166,9 +3321,19 @@ async function shutdown(signal) {
   }
   process.exit(0);
 }
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+if (!runtime.edge) process.on('SIGTERM', () => shutdown('SIGTERM'));
+if (!runtime.edge) process.on('SIGINT', () => shutdown('SIGINT'));
 
-start();
-
-module.exports = { app, db, redis, io };
+if (!runtime.edge) start();
+return { app, db, redis, io, sweepDispatch, bootstrapAdmin, processBackground, payments, maps, jobs, notifications,
+  async initialize() {
+    validateRuntimeConfig(config);
+    await db.query('SELECT 1');
+    dbConnected = true;
+    redisConnected = true;
+    await app.ready();
+  }
+};
+}
+module.exports = { createBackend };
+if (require.main === module) createBackend();

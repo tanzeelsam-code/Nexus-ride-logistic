@@ -1,0 +1,420 @@
+:root {
+  --bg: #f5f6f0;
+  --card-bg: #fff;
+  --card-border: #dfe5db;
+  --primary: #21634c;
+  --accent: #6d8b70;
+  --success: #21634c;
+  --warning: #f59e0b;
+  --danger: #b54136;
+  --text: #23322a;
+  --text-muted: #6b766e;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: "Plus Jakarta Sans", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px;
+}
+
+.mobile-frame {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 40px;
+}
+
+/* Driver Status Header */
+.driver-header {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 20px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 10px 25px rgba(30, 55, 35, 0.04);
+}
+
+.driver-profile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.driver-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--accent), var(--primary));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.status-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 30px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: var(--success);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Earnings Summary */
+.earnings-card {
+  background: #edf2e7;
+  border: 1px solid #dfe5db;
+  border-radius: 20px;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.earnings-card::after {
+  content: "";
+  position: absolute;
+  top: -30px;
+  right: -30px;
+  width: 100px;
+  height: 100px;
+  background: radial-gradient(circle, rgba(0, 229, 255, 0.15), transparent 70%);
+  pointer-events: none;
+}
+
+.earnings-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.earnings-val {
+  font-size: 36px;
+  font-weight: 800;
+  color: var(--text);
+  margin: 6px 0;
+  font-family: "JetBrains Mono", monospace;
+}
+
+.earnings-stats {
+  display: flex;
+  gap: 20px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.stat-badge {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* Active Job Card */
+.job-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 20px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.job-badge-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.job-type-pill {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: #edf2e7;
+  color: #21634c;
+  border: 1px solid #dfe5db;
+}
+
+.payout-pill {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--success);
+}
+
+.address-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+  padding-left: 14px;
+  border-left: 2px dashed #dfe5db;
+  margin-left: 6px;
+}
+
+.addr-point {
+  font-size: 13px;
+}
+.addr-point span {
+  display: block;
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Action Buttons */
+.btn-action {
+  width: 100%;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--primary);
+  border: none;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 20px transparent;
+  transition: all 0.2s;
+}
+
+.btn-action:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 25px transparent;
+}
+
+/* Digital Proof of Delivery Modal / Drawer */
+#pod-modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  z-index: 10000;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.pod-dialog {
+  width: 100%;
+  max-width: 440px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 20px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.pod-title {
+  font-size: 16px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.input-group label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.input-group input {
+  background: white;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 12px;
+  color: #23322a;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+/* Canvas Signature Pad */
+.sig-canvas-wrap {
+  border: 1px solid var(--card-border);
+  background: #fff;
+  border-radius: 12px;
+  position: relative;
+}
+canvas {
+  width: 100%;
+  height: 140px;
+  border-radius: 12px;
+  touch-action: none;
+}
+.clear-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #dfe5db;
+  border: none;
+  color: var(--text-muted);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.notice {
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 24px 12px;
+}
+.notice strong {
+  color: var(--text);
+  display: block;
+  font-size: 15px;
+  margin-bottom: 6px;
+}
+.error-text {
+  color: var(--danger);
+  font-size: 12px;
+  min-height: 16px;
+  margin-top: 6px;
+}
+.btn-row {
+  display: flex;
+  gap: 10px;
+}
+.btn-secondary {
+  background: #dfe5db !important;
+  color: #23322a !important;
+  box-shadow: none !important;
+}
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.jobs {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.driver-brand {
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 0 30px;
+}
+.driver-brand a:first-child {
+  font-weight: 800;
+  font-size: 26px;
+  letter-spacing: -1.5px;
+  color: #21634c;
+}
+.driver-brand a {
+  color: #21634c;
+  text-decoration: none;
+}
+.mobile-frame {
+  max-width: 640px;
+}
+.input-group {
+  margin-bottom: 16px;
+}
+.btn-secondary {
+  background: #edf2e7 !important;
+  color: #21634c !important;
+}
+.driver-profile h1 {
+  font-size: 18px;
+}
+a {
+  color: #21634c;
+}
+.input-group input {
+  min-width: 0;
+}
+.payout-section {
+  margin: 18px 0;
+}
+.payout-section p {
+  font-size: 13px;
+  line-height: 1.7;
+}
+.earnings-card::after {
+  display: none;
+}
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+button:focus-visible,
+input:focus-visible {
+  outline: 3px solid #97b7a3;
+  outline-offset: 3px;
+}
+#pod-modal {
+  overflow: auto;
+}
+.pod-dialog {
+  max-height: 95vh;
+  overflow: auto;
+}
+.notification-controls {
+  margin-top: 16px;
+}
+.notification-controls p {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.location-details summary {
+  cursor: pointer;
+  color: #6b766e;
+  font-size: 13px;
+}
+.btn-row {
+  flex-wrap: wrap;
+}
+.btn-row .btn-action {
+  flex: 1;
+  min-width: 120px;
+}

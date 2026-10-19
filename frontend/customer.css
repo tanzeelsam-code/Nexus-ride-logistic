@@ -1,0 +1,209 @@
+[hidden] {
+  display: none !important;
+}
+.page-intro {
+  margin: 38px 0 26px;
+}
+.page-intro p {
+  color: var(--muted);
+  margin-top: 12px;
+}
+.auth-layout {
+  max-width: 640px;
+}
+.account-bar,
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.account-bar button {
+  font-size: 13px;
+  padding: 10px 14px;
+}
+.journey-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 440px) minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+.journey-layout .card {
+  margin: 20px 0;
+}
+.booking-card label {
+  margin-bottom: 6px;
+}
+.address-search {
+  display: flex;
+  gap: 8px;
+}
+.address-search input {
+  min-width: 0;
+  flex: 1;
+}
+.address-search button {
+  margin: 0 !important;
+}
+.location-tools {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.text-button {
+  border: 0;
+  background: transparent !important;
+  color: var(--green) !important;
+  padding: 12px 0;
+  font-size: 13px;
+  box-shadow: none;
+}
+.wide {
+  width: 100%;
+  margin-right: 0 !important;
+}
+.place-results {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+.place-results button {
+  background: #f0f3eb !important;
+  color: var(--text) !important;
+  border: 1px solid var(--line) !important;
+  text-align: left;
+  font-weight: 400;
+  line-height: 1.5;
+  margin: 0 !important;
+}
+.place-results button:hover {
+  background: #e5eddf !important;
+}
+.map-panel {
+  position: sticky;
+  top: 24px;
+  margin-top: 20px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  overflow: hidden;
+  background: white;
+}
+.map-panel p {
+  padding: 14px 20px;
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.6;
+}
+.map-panel .map-attribution {
+  padding-top: 0;
+  font-size: 11px;
+}
+#journey-map {
+  height: 470px;
+  background: #e9eee6;
+  z-index: 0;
+}
+.fare {
+  display: block;
+  font-size: 40px;
+  letter-spacing: -1.5px;
+  color: var(--green);
+  margin-top: 15px;
+}
+.pin-code {
+  letter-spacing: 6px;
+  font-size: 28px;
+  color: var(--green);
+  font-weight: 700;
+}
+.trip-status {
+  display: inline-block;
+  border-radius: 30px;
+  padding: 7px 12px;
+  background: #edf2e8;
+  color: var(--green);
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+.ride-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.rating-options {
+  display: flex;
+  gap: 6px;
+}
+.rating-options button {
+  min-width: 40px;
+  padding: 10px;
+}
+#card-payment {
+  margin: 18px 0;
+}
+#registration {
+  padding-top: 22px;
+}
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid #97b7a3;
+  outline-offset: 3px;
+}
+.map-pin {
+  background: #21634c;
+  border: 3px solid white;
+  border-radius: 50%;
+  box-shadow: 0 1px 8px #0003;
+}
+.map-pin.destination {
+  background: #b57732;
+}
+.map-pin.driver {
+  background: #2767a1;
+}
+#ride-error {
+  white-space: pre-wrap;
+}
+#map-caption {
+  min-height: 48px;
+}
+@media (max-width: 760px) {
+  .journey-layout {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .map-panel {
+    position: static;
+    grid-row: 1;
+  }
+  #journey-map {
+    height: 270px;
+  }
+  .account-bar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .page-intro {
+    margin-top: 22px;
+  }
+  .map-panel .map-attribution {
+    font-size: 10px;
+  }
+  .card {
+    padding: 22px;
+  }
+  .address-search button {
+    padding: 10px 12px;
+  }
+  .fare {
+    font-size: 34px;
+  }
+}

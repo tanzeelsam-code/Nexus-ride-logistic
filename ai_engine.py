@@ -1,12 +1,11 @@
 """
-NEXUS LOGISTICS — NEXUS CORE AI ENGINE
+NEXORA LOGISTICS — NEXORA CORE AI ENGINE
 =======================================
-Multi-model AI system for intelligent transportation operations.
-Handles: Dispatch, Routing, Pricing, ETA, Safety, Fraud, Forecasting
+Deterministic operations baseline. Untrained research models are disabled.
+Handles: proximity dispatch, rate-card pricing, approximate ETA, safety and fraud rules
 
 Requirements:
-  pip install fastapi uvicorn torch numpy scikit-learn redis kafka-python
-              geopy shapely openai anthropic httpx asyncio aioredis pydantic
+  pip install -r ai/requirements.txt
 """
 
 import asyncio
@@ -21,10 +20,6 @@ from typing import Optional, List, Dict, Any, Tuple
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 
-import numpy as np
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -32,7 +27,7 @@ from redis import asyncio as aioredis
 import httpx
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(name)s] %(levelname)s: %(message)s')
-logger = logging.getLogger("NEXUS-CORE")
+logger = logging.getLogger("NEXORA-CORE")
 
 # ============================================================
 # CONFIGURATION
@@ -44,11 +39,6 @@ class Config:
     MAPS_API_KEY = os.getenv("MAPBOX_API_KEY", "")
     WEATHER_API_KEY = os.getenv("WEATHER_API_KEY", "")
     ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
-    
-    # Model paths
-    DISPATCH_MODEL_PATH = "models/dispatch_brain_v3.pt"
-    ETA_MODEL_PATH = "models/eta_prophet_v4.pt"
-    DEMAND_MODEL_PATH = "models/demand_oracle_v2.pt"
     
     # AI thresholds
     MIN_DRIVER_SCORE = 0.35          # Minimum dispatch score to accept
@@ -176,200 +166,31 @@ class ETAResult:
 # NEURAL NETWORK MODELS
 # ============================================================
 
-class DispatchBrainNet(nn.Module):
-    """
-    Deep neural network for driver-request matching.
-    Inputs: Driver features + Request features + Context features
-    Output: Match score (0-1)
-    
-    Architecture: Multi-head attention over driver candidates
-    """
-    
-    def __init__(self, driver_features=32, request_features=24, context_features=16):
-        super().__init__()
-        
-        total_features = driver_features + request_features + context_features
-        
-        # Shared embedding layers
-        self.driver_encoder = nn.Sequential(
-            nn.Linear(driver_features, 64),
-            nn.LayerNorm(64),
-            nn.GELU(),
-            nn.Linear(64, 128),
-            nn.LayerNorm(128),
-            nn.GELU(),
-            nn.Dropout(0.1)
-        )
-        
-        self.request_encoder = nn.Sequential(
-            nn.Linear(request_features, 64),
-            nn.LayerNorm(64),
-            nn.GELU(),
-            nn.Linear(64, 128),
-            nn.LayerNorm(128),
-            nn.GELU(),
-        )
-        
-        self.context_encoder = nn.Sequential(
-            nn.Linear(context_features, 32),
-            nn.GELU(),
-            nn.Linear(32, 64),
-        )
-        
-        # Cross-attention: request attends to driver
-        self.cross_attention = nn.MultiheadAttention(128, num_heads=4, dropout=0.1, batch_first=True)
-        
-        # Final scoring head
-        self.scorer = nn.Sequential(
-            nn.Linear(128 + 128 + 64, 256),
-            nn.LayerNorm(256),
-            nn.GELU(),
-            nn.Dropout(0.15),
-            nn.Linear(256, 64),
-            nn.GELU(),
-            nn.Linear(64, 1),
-            nn.Sigmoid()
-        )
-    
-    def forward(self, driver_feats, request_feats, context_feats):
-        """
-        driver_feats:  [batch, driver_features]
-        request_feats: [batch, request_features]
-        context_feats: [batch, context_features]
-        """
-        d_enc = self.driver_encoder(driver_feats)        # [B, 128]
-        r_enc = self.request_encoder(request_feats)      # [B, 128]
-        c_enc = self.context_encoder(context_feats)      # [B, 64]
-        
-        # Cross-attention (driver features attend to request context)
-        d_seq = d_enc.unsqueeze(1)                       # [B, 1, 128]
-        r_seq = r_enc.unsqueeze(1)                       # [B, 1, 128]
-        attended, _ = self.cross_attention(d_seq, r_seq, r_seq)
-        attended = attended.squeeze(1)                    # [B, 128]
-        
-        # Concatenate all representations
-        combined = torch.cat([attended, r_enc, c_enc], dim=1)  # [B, 320]
-        score = self.scorer(combined)                    # [B, 1]
-        return score.squeeze(1)
-
-
-class ETAProphetNet(nn.Module):
-    """
-    LSTM-based ETA prediction with contextual features.
-    Considers: distance, time of day, weather, traffic, day of week, 
-               historical patterns for that route
-    """
-    
-    def __init__(self, input_size=20, hidden_size=128, num_layers=3):
-        super().__init__()
-        
-        self.feature_proj = nn.Linear(input_size, 64)
-        
-        self.lstm = nn.LSTM(
-            64, hidden_size, num_layers=num_layers,
-            batch_first=True, dropout=0.2, bidirectional=True
-        )
-        
-        self.output_head = nn.Sequential(
-            nn.Linear(hidden_size * 2, 128),
-            nn.ReLU(),
-            nn.Dropout(0.1),
-            nn.Linear(128, 32),
-            nn.ReLU(),
-            nn.Linear(32, 2)  # [pickup_eta, dropoff_eta]
-        )
-        
-        # Confidence estimator
-        self.confidence_head = nn.Sequential(
-            nn.Linear(hidden_size * 2, 32),
-            nn.ReLU(),
-            nn.Linear(32, 1),
-            nn.Sigmoid()
-        )
-    
-    def forward(self, features_seq):
-        """features_seq: [batch, seq_len, input_size]"""
-        proj = F.relu(self.feature_proj(features_seq))
-        lstm_out, (h_n, _) = self.lstm(proj)
-        last_out = lstm_out[:, -1, :]       # Last timestep
-        eta = F.relu(self.output_head(last_out))
-        confidence = self.confidence_head(last_out)
-        return eta, confidence
-
-
-class DemandOracleNet(nn.Module):
-    """
-    Transformer-based demand forecasting.
-    Predicts demand heatmap for next 72 hours across zones.
-    """
-    
-    def __init__(self, n_zones=50, seq_len=168, d_model=128, nhead=8, n_layers=4):
-        super().__init__()
-        
-        self.zone_embedding = nn.Embedding(n_zones, d_model // 4)
-        self.time_embedding = nn.Linear(4, d_model // 4)    # hour, day, month, is_holiday
-        self.feature_proj = nn.Linear(10, d_model // 2)     # Historical demand + weather features
-        
-        self.input_proj = nn.Linear(d_model, d_model)
-        
-        encoder_layer = nn.TransformerEncoderLayer(
-            d_model=d_model, nhead=nhead, 
-            dim_feedforward=512, dropout=0.1,
-            batch_first=True, norm_first=True
-        )
-        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=n_layers)
-        
-        # Multi-horizon prediction (next 1h, 4h, 12h, 24h, 72h)
-        self.forecast_heads = nn.ModuleList([
-            nn.Linear(d_model, n_zones) for _ in range(5)
-        ])
-    
-    def forward(self, zone_ids, time_feats, historical_feats):
-        z_emb = self.zone_embedding(zone_ids)
-        t_emb = self.time_embedding(time_feats)
-        f_emb = self.feature_proj(historical_feats)
-
-        # Time features are per-request; broadcast them across the zone sequence.
-        t_emb = t_emb.unsqueeze(1).expand(-1, z_emb.size(1), -1)
-
-        x = torch.cat([z_emb, t_emb, f_emb], dim=-1)
-        x = self.input_proj(x)
-        x = self.transformer(x)
-        
-        forecasts = [head(x[:, -1, :]) for head in self.forecast_heads]
-        return torch.stack(forecasts, dim=1)  # [B, 5_horizons, n_zones]
-
 # ============================================================
 # AI ENGINE — CORE CLASS
 # ============================================================
 
-class NexusCore:
+class NexoraCore:
     """
-    Central AI brain. Orchestrates all AI decisions for NEXUS LOGISTICS.
+    Central AI brain. Orchestrates all AI decisions for NEXORA LOGISTICS.
     """
     
     def __init__(self):
         self.redis: Optional[aioredis.Redis] = None
         self._initialized = False
         
-        # Load models
-        self.dispatch_model = DispatchBrainNet()
-        self.eta_model = ETAProphetNet()
-        self.demand_model = DemandOracleNet()
-        
-        self.dispatch_model.eval()
-        self.eta_model.eval()
-        self.demand_model.eval()
-        
-        logger.info("NEXUS CORE initialized with all AI models")
-    
+        # Neural architectures are retained for offline research only. No random
+        # model is instantiated or allowed to influence operational decisions.
+        self.model_status = {"dispatch": "deterministic_proximity", "eta": "distance_estimate", "demand": "unavailable_no_training_data"}
+        logger.info("NEXORA CORE initialized in deterministic baseline mode")
+
     async def initialize(self):
         """Connect to infrastructure services"""
         try:
             client = aioredis.from_url(Config.REDIS_URL, decode_responses=True)
             await client.ping()
             self.redis = client
-            logger.info("NEXUS CORE connected to Redis")
+            logger.info("NEXORA CORE connected to Redis")
         except Exception as exc:
             # Surge/fraud/safety caches are optional; run without them rather than crash.
             self.redis = None
@@ -382,11 +203,11 @@ class NexusCore:
     
     async def dispatch(self, request: RideRequest, nearby_drivers: List[Driver]) -> Optional[DispatchDecision]:
         """
-        Find the optimal driver for a given request using DispatchBrainNet.
+        Rank eligible drivers using a deterministic proximity baseline.
         
         Algorithm:
         1. Filter ineligible drivers (wrong vehicle type, wrong service capability)
-        2. Score all eligible drivers using the neural network
+        2. Score eligible drivers by distance to pickup
         3. Apply business rules as hard constraints
         4. Select highest scoring driver
         5. Log decision for model monitoring
@@ -403,24 +224,11 @@ class NexusCore:
             return None
         
         # Limit candidates for performance
-        candidates = eligible[:Config.MAX_DISPATCH_CANDIDATES]
+        candidates = sorted(eligible, key=lambda driver: driver.location.distance_km(request.pickup))[:Config.MAX_DISPATCH_CANDIDATES]
         
-        # Step 2: Feature engineering
-        request_features = self._extract_request_features(request)
-        context_features = await self._extract_context_features(request)
-        
-        scores = []
-        with torch.no_grad():
-            for driver in candidates:
-                driver_features = self._extract_driver_features(driver, request)
-                
-                d_tensor = torch.tensor([driver_features], dtype=torch.float32)
-                r_tensor = torch.tensor([request_features], dtype=torch.float32)
-                c_tensor = torch.tensor([context_features], dtype=torch.float32)
-                
-                score = self.dispatch_model(d_tensor, r_tensor, c_tensor)
-                scores.append((driver, float(score.item())))
-        
+        # A stable proximity baseline is preferable to untrained network weights.
+        scores = [(driver, 1.0 / (1.0 + driver.location.distance_km(request.pickup))) for driver in candidates]
+
         # Step 3: Apply hard constraints and sort
         valid_scores = [(d, s) for d, s in scores if s >= Config.MIN_DRIVER_SCORE]
         if not valid_scores:
@@ -461,9 +269,7 @@ class NexusCore:
                 "processing_ms": processing_ms,
                 "candidates_evaluated": len(candidates),
                 "score_breakdown": {
-                    "proximity": min(1.0, 1.0 - distance_to_pickup / 10),
-                    "rating": best_driver.rating / 5,
-                    "reliability": best_driver.completion_rate / 100,
+                    "proximity": best_score,
                 }
             }
         )
@@ -502,162 +308,25 @@ class NexusCore:
             eligible.append(driver)
         return eligible
     
-    def _extract_driver_features(self, driver: Driver, request: RideRequest) -> List[float]:
-        """Extract 32 numerical features from driver for the model"""
-        dist_to_pickup = driver.location.distance_km(request.pickup)
-        dist_to_dropoff = request.pickup.distance_km(request.dropoff)
-        
-        return [
-            dist_to_pickup / 20.0,                          # Normalized distance (0-20km)
-            driver.rating / 5.0,                            # Rating
-            driver.acceptance_rate / 100.0,                 # Acceptance rate
-            driver.completion_rate / 100.0,                 # Completion rate
-            min(driver.total_trips / 1000.0, 1.0),         # Experience (capped)
-            1.0 if driver.is_verified else 0.0,             # Verification status
-            driver.battery_pct / 100.0,                     # Phone battery
-            driver.current_passengers / 4.0,                # Current load
-            
-            # Vehicle type one-hot (8 types)
-            1.0 if driver.vehicle_type == 'sedan' else 0.0,
-            1.0 if driver.vehicle_type == 'suv' else 0.0,
-            1.0 if driver.vehicle_type == 'luxury' else 0.0,
-            1.0 if driver.vehicle_type == 'van' else 0.0,
-            1.0 if driver.vehicle_type == 'truck_small' else 0.0,
-            1.0 if driver.vehicle_type == 'truck_medium' else 0.0,
-            1.0 if driver.vehicle_type == 'truck_large' else 0.0,
-            1.0 if driver.vehicle_type == 'refrigerated' else 0.0,
-            
-            # Service type capabilities
-            1.0 if 'taxi' in driver.service_types else 0.0,
-            1.0 if 'freight' in driver.service_types else 0.0,
-            1.0 if 'cold_chain' in driver.service_types else 0.0,
-            
-            # Geographic features
-            (driver.lat - request.pickup.lat) / 0.5,        # Relative lat
-            (driver.lng - request.pickup.lng) / 0.5,        # Relative lng
-            
-            # ETA components
-            min(dist_to_pickup * 2.0 / 60.0, 1.0),         # Rough pickup ETA
-            min(dist_to_dropoff * 2.0 / 60.0, 1.0),        # Trip duration estimate
-            
-            # Padding to 32 features
-            0.0, 0.0, 0.0, 0.0,
-            0.0, 0.0, 0.0, 0.0,
-            0.0,
-        ]
-    
-    def _extract_request_features(self, request: RideRequest) -> List[float]:
-        """Extract 24 numerical features from request"""
-        now = datetime.utcnow()
-        hour = now.hour
-        dow = now.weekday()
-        
-        dist = request.pickup.distance_km(request.dropoff)
-        
-        return [
-            request.pickup.lat / 90.0,
-            request.pickup.lng / 180.0,
-            request.dropoff.lat / 90.0,
-            request.dropoff.lng / 180.0,
-            min(dist / 50.0, 1.0),                          # Trip distance
-            hour / 23.0,                                     # Hour of day
-            dow / 6.0,                                       # Day of week
-            math.sin(2 * math.pi * hour / 24),              # Cyclical hour sin
-            math.cos(2 * math.pi * hour / 24),              # Cyclical hour cos
-            math.sin(2 * math.pi * dow / 7),                # Cyclical dow sin
-            math.cos(2 * math.pi * dow / 7),                # Cyclical dow cos
-            request.passengers / 8.0,                        # Passenger count
-            1.0 if request.is_premium else 0.0,
-            1.0 if request.requires_refrigeration else 0.0,
-            (request.cargo_weight_kg or 0) / 1000.0,
-            (request.cargo_volume_m3 or 0) / 20.0,
-            
-            # Service type one-hot
-            1.0 if request.service_type == ServiceType.TAXI else 0.0,
-            1.0 if request.service_type == ServiceType.FREIGHT else 0.0,
-            1.0 if request.service_type == ServiceType.COLD_CHAIN else 0.0,
-            1.0 if request.service_type == ServiceType.MEDICAL else 0.0,
-            1.0 if request.service_type == ServiceType.AIRPORT else 0.0,
-            
-            # Padding to 24
-            0.0, 0.0, 0.0,
-        ]
-    
-    async def _extract_context_features(self, request: RideRequest) -> List[float]:
-        """Extract 16 context features (traffic, weather, demand level)"""
-        # In production: fetch from Redis cache (updated by Kafka streams)
-        surge = await self.get_surge_multiplier(request.pickup, request.service_type)
-        
-        now = datetime.utcnow()
-        is_peak = 1.0 if now.hour in [7,8,9,17,18,19] else 0.0
-        is_weekend = 1.0 if now.weekday() >= 5 else 0.0
-        
-        return [
-            surge / Config.MAX_SURGE,                        # Current surge (normalized)
-            is_peak,                                         # Peak hours
-            is_weekend,                                      # Weekend
-            0.5,                                             # Traffic density (0=clear, 1=jam)
-            0.2,                                             # Rain probability
-            0.0,                                             # Special event nearby
-            0.7,                                             # Driver supply ratio in zone
-            0.6,                                             # Historical demand this slot
-            
-            # Padding to 16
-            0.0, 0.0, 0.0, 0.0,
-            0.0, 0.0, 0.0, 0.0,
-        ]
-    
     # ----------------------------------------------------------
     # MODULE 2: ETA PROPHET
     # ----------------------------------------------------------
     
     async def predict_eta(self, driver: Driver, pickup: Location, dropoff: Location) -> ETAResult:
         """
-        Predict pickup and dropoff ETAs using ETAProphetNet.
-        Factors: distance, speed limits, traffic, time of day, weather
+        Return explicitly approximate distance-based ETAs.
+        The main booking API uses map-provider road routes and traffic.
         """
         dist_pickup = driver.location.distance_km(pickup)
         dist_trip = pickup.distance_km(dropoff)
         now = datetime.utcnow()
         
-        # Feature sequence (last 5 time steps for LSTM)
-        features = []
-        for i in range(5):
-            dt = now - timedelta(minutes=i*5)
-            features.append([
-                dist_pickup / 50.0,
-                dist_trip / 100.0,
-                dt.hour / 23.0,
-                dt.weekday() / 6.0,
-                math.sin(2 * math.pi * dt.hour / 24),
-                math.cos(2 * math.pi * dt.hour / 24),
-                0.5,   # Traffic level (from API)
-                0.2,   # Weather factor
-                0.0,   # Construction zone
-                1.0 if dt.hour in [7,8,9,17,18,19] else 0.0,  # Peak hour
-                # Speed context
-                40.0 / 130.0,   # Average speed (normalized)
-                # Route complexity
-                min(dist_pickup / 20.0, 1.0),
-                min(dist_trip / 50.0, 1.0),
-                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0  # Padding to 20
-            ])
-        
-        features_tensor = torch.tensor([features], dtype=torch.float32)
-        
-        with torch.no_grad():
-            eta_raw, confidence = self.eta_model(features_tensor)
-        
-        pickup_min = float(eta_raw[0, 0].item()) * 60  # Scale to minutes
-        dropoff_min = float(eta_raw[0, 1].item()) * 60
-        conf = float(confidence[0].item())
-        
-        # Sanity: enforce minimum ETAs based on raw distance
-        min_pickup = (dist_pickup / 40.0) * 60  # 40 km/h average
-        min_dropoff = (dist_trip / 30.0) * 60   # 30 km/h in traffic
-        pickup_min = max(pickup_min, min_pickup)
-        dropoff_min = max(dropoff_min, min_dropoff)
-        
+        # This fallback is explicitly an estimate, not a calibrated model.
+        # The booking API uses road distance and traffic from its map provider.
+        pickup_min = dist_pickup * 1.3 / 30.0 * 60
+        dropoff_min = dist_trip * 1.3 / 30.0 * 60
+        conf = 0.0
+
         return ETAResult(
             pickup_min=round(pickup_min, 1),
             dropoff_min=round(dropoff_min, 1),
@@ -665,14 +334,15 @@ class NexusCore:
             factors={
                 "distance_to_pickup_km": round(dist_pickup, 2),
                 "trip_distance_km": round(dist_trip, 2),
-                "traffic_factor": 0.5,
+                "source": "distance_estimate",
+                "traffic_factor": None,
                 "weather_factor": 0.0,
                 "is_peak_hour": now.hour in [7,8,9,17,18,19],
             }
         )
     
     # ----------------------------------------------------------
-    # MODULE 3: PRICING ENGINE (Reinforcement Learning)
+    # MODULE 3: RATE-CARD PRICING
     # ----------------------------------------------------------
     
     async def calculate_price(self,
@@ -680,10 +350,8 @@ class NexusCore:
                               zone: Dict,
                               weather_severity: float = 0.0) -> PricingResult:
         """
-        Dynamic pricing using supply/demand ratios + RL surge.
-        
-        RL Policy: Maximize revenue while maintaining driver supply 
-                   and customer satisfaction metrics.
+        Deterministic rate-card pricing with neutral surge.
+
         """
         service = request.service_type
         dist = request.pickup.distance_km(request.dropoff)
@@ -709,7 +377,7 @@ class NexusCore:
         distance_fare = dist * per_km
         time_fare = est_duration_min * per_min
         
-        # AI Surge Calculation
+        # Neutral surge until measured demand data is available
         surge = await self.get_surge_multiplier(request.pickup, service)
         
         # Weather premium
@@ -761,26 +429,8 @@ class NexusCore:
         if cached:
             return float(cached)
         
-        # Simulate: In production, query real-time driver counts from Redis
-        demand = 12   # Active requests in zone
-        supply = 8    # Available drivers in zone
-        
-        ratio = demand / max(supply, 1)
-        
-        if ratio <= 1.0:
-            surge = 1.0
-        elif ratio <= Config.SURGE_TRIGGER_RATIO:
-            surge = 1.0
-        else:
-            surge = 1.0 + (ratio - 1.0) * 0.45
-        
-        surge = round(min(max(surge, Config.MIN_SURGE), Config.MAX_SURGE), 2)
-        
-        # Cache for 30 seconds
-        if self.redis:
-            await self.redis.setex(cache_key, 30, str(surge))
-        
-        return surge
+        # Do not manufacture demand/supply inputs for a surge multiplier.
+        return 1.0
     
     # ----------------------------------------------------------
     # MODULE 4: DEMAND ORACLE
@@ -791,34 +441,14 @@ class NexusCore:
         Forecast demand across zones for the next N hours.
         Returns heatmap data for operations dashboard.
         """
-        now = datetime.utcnow()
-        
-        zone_tensor = torch.tensor([zone_ids], dtype=torch.long)
-        time_feats = torch.tensor([[
-            now.hour / 23.0,
-            now.weekday() / 6.0,
-            now.month / 12.0,
-            1.0 if now.weekday() >= 5 else 0.0
-        ]], dtype=torch.float32)
-        hist_feats = torch.zeros(1, len(zone_ids), 10)  # Would be real historical data
-        
-        with torch.no_grad():
-            forecasts = self.demand_model(zone_tensor, time_feats, hist_feats)
-        
-        horizons = ["1h", "4h", "12h", "24h", "72h"]
-        result = {}
-        for i, h in enumerate(horizons):
-            result[h] = {
-                f"zone_{z}": float(forecasts[0, i, j].item())
-                for j, z in enumerate(zone_ids)
-            }
-        
         return {
-            "forecast_at": now.isoformat(),
-            "horizons": result,
-            "recommended_positioning": self._recommend_driver_positioning(result["1h"])
+            "available": False,
+            "reason": "Historical demand data and a validated forecasting model are not configured.",
+            "forecast_at": datetime.utcnow().isoformat(),
+            "horizons": {},
+            "recommended_positioning": [],
         }
-    
+
     def _recommend_driver_positioning(self, demand_forecast: Dict) -> List[Dict]:
         """Recommend where drivers should pre-position based on 1h demand forecast"""
         sorted_zones = sorted(demand_forecast.items(), key=lambda x: x[1], reverse=True)
@@ -968,7 +598,7 @@ class NexusCore:
         }
     
     # ----------------------------------------------------------
-    # MODULE 7: NEXUS CHAT (AI Customer Support)
+    # MODULE 7: NEXORA CHAT (AI Customer Support)
     # ----------------------------------------------------------
     
     async def handle_support_query(self, query: str, context: Dict) -> str:
@@ -977,7 +607,7 @@ class NexusCore:
         Handles: trip issues, billing disputes, driver complaints,
                  ETA queries, cancellation requests.
         """
-        system_prompt = """You are NEXUS, an AI customer support agent for NEXUS LOGISTICS.
+        system_prompt = """You are NEXORA, an AI customer support agent for NEXORA LOGISTICS.
 You help with:
 - Ride and delivery status
 - Billing and payment issues  
@@ -1023,10 +653,10 @@ Issue Type: {context.get('issue_type', 'general')}
                 data = response.json()
                 return data['content'][0]['text']
         except Exception as e:
-            logger.error(f"NexusChat error: {e}")
+            logger.error(f"NexoraChat error: {e}")
             return ("I apologize, I'm having trouble processing your request right now. "
-                   "Please contact our support team directly at support@nexuslogistics.ai "
-                   "or call +1-800-NEXUS-GO.")
+                   "Please contact our support team directly at support@nexoralogistics.ai "
+                   "or call +1-800-NEXORA-GO.")
     
     # ----------------------------------------------------------
     # MODULE 8: LOAD OPTIMIZER (Freight)
@@ -1103,8 +733,8 @@ Issue Type: {context.get('issue_type', 'general')}
 # ============================================================
 
 app = FastAPI(
-    title="NEXUS CORE — AI Engine",
-    description="Central AI decision engine for NEXUS LOGISTICS",
+    title="NEXORA CORE — AI Engine",
+    description="Central AI decision engine for NEXORA LOGISTICS",
     version="3.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
@@ -1112,13 +742,13 @@ app = FastAPI(
 
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-nexus_core = NexusCore()
+nexora_core = NexoraCore()
 
 
 @app.on_event("startup")
 async def startup():
-    await nexus_core.initialize()
-    logger.info("🚀 NEXUS CORE API started")
+    await nexora_core.initialize()
+    logger.info("🚀 NEXORA CORE API started")
 
 
 # -- Request/Response Models --
@@ -1183,12 +813,12 @@ class FraudCheckRequest(BaseModel):
 async def health():
     return {
         "status": "healthy",
-        "service": "NEXUS CORE AI",
+        "service": "NEXORA CORE AI",
         "version": "3.0.0",
         "models": {
-            "dispatch_brain": "loaded",
-            "eta_prophet": "loaded",
-            "demand_oracle": "loaded"
+            "dispatch_brain": "disabled_untrained",
+            "eta_prophet": "disabled_untrained",
+            "demand_oracle": "disabled_untrained"
         },
         "timestamp": datetime.utcnow().isoformat()
     }
@@ -1230,7 +860,7 @@ async def dispatch_driver(req: DispatchRequest, background_tasks: BackgroundTask
         # Never fabricate drivers: the caller must supply real candidates.
         raise HTTPException(status_code=503, detail="No available drivers in your area")
 
-    decision = await nexus_core.dispatch(request, candidate_drivers)
+    decision = await nexora_core.dispatch(request, candidate_drivers)
     
     if not decision:
         raise HTTPException(status_code=503, detail="No available drivers in your area")
@@ -1242,7 +872,9 @@ async def dispatch_driver(req: DispatchRequest, background_tasks: BackgroundTask
         "eta_pickup_min": decision.estimated_pickup_min,
         "eta_dropoff_min": decision.estimated_trip_min,
         "alternatives_considered": decision.alternatives_considered,
-        "ai_score": decision.driver_score,
+        "ai_score": None,
+        "model_status": "deterministic_baseline",
+        "ranking_method": "proximity",
         "reasoning": decision.reasoning
     }
 
@@ -1268,7 +900,7 @@ async def estimate_price(req: PriceRequest):
         "freight_per_km": 2.00, "freight_per_kg": 0.05, "freight_per_m3": 2.00
     }
     
-    pricing = await nexus_core.calculate_price(request, zone)
+    pricing = await nexora_core.calculate_price(request, zone)
     
     return {
         "breakdown": {
@@ -1288,13 +920,13 @@ async def estimate_price(req: PriceRequest):
 @app.post("/safety/analyze")
 async def analyze_safety(req: SafetyCheckRequest):
     """Analyze real-time trip safety telemetry"""
-    result = await nexus_core.analyze_trip_safety(req.trip_id, req.dict())
+    result = await nexora_core.analyze_trip_safety(req.trip_id, req.dict())
     return result
 
 
 @app.post("/support/chat")
 async def support_chat(req: SupportRequest):
-    """NexusChat AI customer support"""
+    """NexoraChat AI customer support"""
     context = {
         "customer_name": req.customer_name,
         "tier": req.tier,
@@ -1302,11 +934,11 @@ async def support_chat(req: SupportRequest):
         "recent_trips_count": req.recent_trips_count,
         "issue_type": req.issue_type
     }
-    response = await nexus_core.handle_support_query(req.query, context)
+    response = await nexora_core.handle_support_query(req.query, context)
     return {
         "response": response,
-        "responded_by": "NEXUS AI",
-        "escalation_required": "support@nexuslogistics.ai" in response,
+        "responded_by": "NEXORA AI",
+        "escalation_required": "support@nexoralogistics.ai" in response,
         "timestamp": datetime.utcnow().isoformat()
     }
 
@@ -1314,21 +946,21 @@ async def support_chat(req: SupportRequest):
 @app.post("/fraud/check")
 async def fraud_check(req: FraudCheckRequest):
     """Real-time fraud detection for payment"""
-    result = await nexus_core.check_fraud(req.dict())
+    result = await nexora_core.check_fraud(req.dict())
     return result
 
 
 @app.post("/demand/forecast")
 async def demand_forecast(zone_ids: List[int] = [0,1,2,3,4]):
     """Forecast demand across zones"""
-    result = await nexus_core.forecast_demand(zone_ids)
+    result = await nexora_core.forecast_demand(zone_ids)
     return result
 
 
 @app.post("/freight/optimize-load")
 async def optimize_load(vehicle: Dict, packages: List[Dict]):
     """Optimize freight loading configuration"""
-    result = nexus_core.optimize_freight_load(vehicle, packages)
+    result = nexora_core.optimize_freight_load(vehicle, packages)
     return result
 
 
@@ -1336,7 +968,7 @@ async def optimize_load(vehicle: Dict, packages: List[Dict]):
 async def get_surge(lat: float, lng: float, service_type: str = "taxi"):
     """Get current surge multiplier for a location"""
     location = Location(lat, lng)
-    surge = await nexus_core.get_surge_multiplier(location, ServiceType(service_type))
+    surge = await nexora_core.get_surge_multiplier(location, ServiceType(service_type))
     return {
         "surge_multiplier": surge,
         "is_surge_active": surge > 1.0,
