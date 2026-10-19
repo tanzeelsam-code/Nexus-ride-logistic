@@ -6,6 +6,9 @@
     location.replace("admin.html?next=ops");
     return;
   }
+  window.addEventListener("nexora:signed-out", () => {
+    document.querySelector(".workspace").hidden = true;
+  });
   window.addEventListener("nexora:session-expired", () =>
     location.replace("admin.html?next=ops"),
   );
@@ -209,10 +212,10 @@
   }
   $("refresh").onclick = refresh;
   setInterval(() => {
-    if (!document.hidden) refresh();
+    if (!document.hidden && W.get("token")) refresh();
   }, 15000);
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) refresh();
+    if (!document.hidden && W.get("token")) refresh();
   });
   $("activity-tabs").onclick = (event) => {
     const b = event.target.closest("[data-activity]");

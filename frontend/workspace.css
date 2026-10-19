@@ -225,7 +225,9 @@ small {
   inset: 0 auto 0 0;
   display: flex;
   flex-direction: column;
-  gap: 36px;
+  gap: 24px;
+  height: 100dvh;
+  overflow: hidden;
   padding: 30px 18px 20px;
   background: #fff;
   border-right: 1px solid var(--line);
@@ -233,6 +235,13 @@ small {
 }
 .sidebar .brand {
   margin: 0 12px;
+  flex-shrink: 0;
+}
+.sidebar > nav {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .nav-group {
   display: grid;
@@ -268,6 +277,19 @@ small {
 }
 .sidebar-bottom {
   margin-top: auto;
+  flex-shrink: 0;
+}
+.sidebar-signout {
+  width: 100%;
+  margin-top: 12px;
+  min-height: 44px;
+  background: var(--green-soft);
+  color: var(--green);
+}
+.header-signout {
+  min-height: 40px;
+  font-size: 12px;
+  flex-shrink: 0;
 }
 .sidebar-note {
   padding: 16px;
@@ -325,6 +347,9 @@ small {
   min-height: 100vh;
 }
 .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   height: 78px;
   border-bottom: 1px solid var(--line);
   display: flex;
@@ -1448,12 +1473,24 @@ dialog::backdrop {
     visibility: visible;
   }
   .sidebar {
-    overflow-y: auto;
+    overflow: hidden;
   }
   .user-copy small {
     display: block;
   }
   .table-scroll {
     scrollbar-width: thin;
+  }
+}
+@media (max-width: 480px) {
+  .topbar .connection,
+  .breadcrumb > span:not(:last-child) {
+    display: none;
+  }
+  .topbar-right {
+    gap: 0;
+  }
+  .header-signout {
+    padding: 8px 10px;
   }
 }

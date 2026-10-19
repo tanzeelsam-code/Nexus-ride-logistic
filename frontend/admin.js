@@ -15,6 +15,7 @@
     document.body.classList.remove("nav-open");
     document.querySelector("dialog[open]")?.close();
   }
+  window.addEventListener("nexora:signed-out", () => signedOut());
   window.addEventListener("nexora:session-expired", () =>
     signedOut("Your session expired. Please sign in again."),
   );

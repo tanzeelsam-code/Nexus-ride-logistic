@@ -15,13 +15,14 @@ node --check backend_api.js
 node --check frontend/workspace.js
 node --check frontend/admin.js
 node --check frontend/ops.js
-node --test scripts/workspace-session.test.cjs
+node --check frontend/tracking.js
+node --test scripts/workspace-session.test.cjs scripts/tracking.test.cjs
 python3 -m py_compile ai_engine.py
 echo "   ✅ Code syntax validation passed."
 
 # 2. Frontend Assets Check
 echo "2) Checking frontend assets..."
-for f in frontend/index.html frontend/ride.html frontend/freight.html frontend/track.html frontend/driver.html frontend/nexora-client.js frontend/admin.html frontend/ops.html frontend/workspace.css frontend/workspace.js frontend/admin.js frontend/ops.js; do
+for f in frontend/index.html frontend/ride.html frontend/freight.html frontend/track.html frontend/driver.html frontend/nexora-client.js frontend/admin.html frontend/ops.html frontend/workspace.css frontend/workspace.js frontend/admin.js frontend/ops.js frontend/tracking.css frontend/tracking.js; do
   if [ ! -f "$f" ]; then
     echo "   ❌ Missing frontend asset: $f"
     exit 1
@@ -118,6 +119,11 @@ expect_code /api/v1/track/DEL-00000 404
 expect_code /api/v1/track/DEL-44200/temperature-report 200
 expect_code /api/v1/track/DEL-44201/temperature-report 404
 expect_code /track/DEL-44200 200
+expect_code /track.html 200
+expect_code /tracking.js 200
+expect_code /tracking.css 200
+expect_code /admin.html 200
+expect_code /ops.html 200
 expect_code /driver.html 200
 echo "      ✅ Tracking API, temperature report, share link and driver page verified."
 

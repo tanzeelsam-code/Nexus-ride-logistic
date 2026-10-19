@@ -51,9 +51,18 @@
     value == null
       ? sessionStorage.removeItem("nexora_ops_" + key)
       : sessionStorage.setItem("nexora_ops_" + key, value);
-  const clear = () =>
+  let sessionGeneration = 0;
+  let signingOut = false;
+  let refreshPromise, toastTimer;
+  const clear = () => {
+    sessionGeneration++;
+    refreshPromise = null;
     ["token", "refresh", "name"].forEach((key) => set(key, null));
+  };
   function save(data) {
+    sessionGeneration++;
+    refreshPromise = null;
+    signingOut = false;
     set("token", data.token);
     set("refresh", data.refresh_token);
     set(
@@ -61,8 +70,17 @@
       [data.user.first_name, data.user.last_name].filter(Boolean).join(" "),
     );
   }
-  let refreshPromise, toastTimer;
+  function ensureSession(generation, issuedTokens) {
+    if (generation === sessionGeneration) return;
+    // Discard and revoke credentials issued for a session that has ended.
+    if (issuedTokens?.token)
+      revoke(issuedTokens.token, issuedTokens.refresh_token);
+    const error = new Error("This session has ended. Please sign in again.");
+    error.status = 401;
+    throw error;
+  }
   async function api(path, body, retry = true) {
+    const generation = sessionGeneration;
     const token = get("token");
     const response = await fetch("/api/v1" + path, {
       method: body === undefined ? "GET" : "POST",
@@ -76,24 +94,33 @@
     const data = await response
       .json()
       .catch(() => ({ error: "The service returned an unexpected response." }));
+    ensureSession(
+      generation,
+      ["/auth/refresh", "/auth/login"].includes(path) ? data : null,
+    );
     if (response.status === 401 && !path.startsWith("/auth/")) {
       if (retry && get("refresh")) {
         try {
-          if (!refreshPromise)
-            refreshPromise = api(
+          if (!refreshPromise) {
+            const pending = api(
               "/auth/refresh",
               { refresh_token: get("refresh") },
               false,
             )
               .then((fresh) => {
+                ensureSession(generation, fresh);
                 set("token", fresh.token);
                 set("refresh", fresh.refresh_token);
               })
               .finally(() => {
-                refreshPromise = null;
+                if (refreshPromise === pending) refreshPromise = null;
               });
+            refreshPromise = pending;
+          }
           await refreshPromise;
+          ensureSession(generation);
         } catch (error) {
+          if (generation !== sessionGeneration) throw error;
           // A transient network failure should not erase a valid saved session.
           if (error.status !== 401 && error.status !== 403) throw error;
           clear();
@@ -126,15 +153,40 @@
     }
     return data;
   }
-  async function signOut() {
-    const request = api("/auth/logout", {
-      refresh_token: get("refresh"),
-    }).catch(() => {});
-    clear();
-    // Let the revocation request finish before leaving the page.
-    await request;
-    location.href = "admin.html";
+  function revoke(token, refreshToken) {
+    if (!token) return;
+    // keepalive allows revocation to finish after navigating to sign-in.
+    try {
+      void fetch("/api/v1/auth/logout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + token,
+        },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+        keepalive: true,
+      }).catch(() => {});
+    } catch {
+      /* Local sign-out still works when the network is unavailable. */
+    }
   }
+  function signOut() {
+    if (signingOut) return;
+    signingOut = true;
+    const token = get("token"),
+      refreshToken = get("refresh");
+    clear();
+    revoke(token, refreshToken);
+    document.querySelector("dialog[open]")?.close();
+    window.dispatchEvent(new Event("nexora:signed-out"));
+    location.replace("/admin.html");
+  }
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted && !get("token")) {
+      window.dispatchEvent(new Event("nexora:signed-out"));
+      if (location.pathname.includes("ops")) location.replace("/admin.html");
+    }
+  });
   const initials = (name) =>
     String(name || "Account")
       .split(/\s+/)
@@ -147,10 +199,9 @@
     const nav = (href, name, glyph, id, external = false) =>
       `<a class="nav-link" href="${href}" ${active === id ? 'aria-current="page"' : ""} data-nav="${id}">${icon(glyph)}${name}${external ? icon("external").replace('class="icon"', 'class="icon arrow"') : ""}</a>`;
     $("sidebar").innerHTML =
-      `<a class="brand" href="/" aria-label="Nexora home"><span class="brand-mark">n</span><span>nexora<small>Workspace</small></span></a><nav aria-label="Workspace navigation"><div class="nav-group"><p class="eyebrow">Workspace</p>${nav("ops.html", "Overview", "grid", "overview")}${nav("admin.html", "Driver approvals", "users", "admin")}${nav("ops.html#fleet", "Fleet", "car", "fleet")}${nav("ops.html#alerts", "Alerts", "bell", "alerts")}</div><div class="nav-group"><p class="eyebrow">Portals</p>${nav("ride.html", "Ride dispatch", "car", "ride", true)}${nav("freight.html", "Freight logistics", "box", "freight", true)}${nav("track.html", "Live tracking", "pin", "track", true)}</div></nav><div class="sidebar-bottom"><div class="sidebar-note"><strong>A little more connected.</strong>One place for your people, rides, and deliveries.</div><div class="user-menu"><span class="avatar">${esc(initials(get("name")))}</span><div class="user-copy"><strong>${esc(get("name") || "Operations account")}</strong><small>Operations workspace</small></div><button class="subtle" id="signout" aria-label="Sign out" title="Sign out">${icon("logout")}</button></div></div>`;
-    $("signout").addEventListener("click", async (event) => {
-      event.currentTarget.disabled = true;
-      await signOut();
+      `<a class="brand" href="/" aria-label="Nexora home"><span class="brand-mark">n</span><span>nexora<small>Workspace</small></span></a><nav aria-label="Workspace navigation"><div class="nav-group"><p class="eyebrow">Workspace</p>${nav("ops.html", "Overview", "grid", "overview")}${nav("admin.html", "Driver approvals", "users", "admin")}${nav("ops.html#fleet", "Fleet", "car", "fleet")}${nav("ops.html#alerts", "Alerts", "bell", "alerts")}</div><div class="nav-group"><p class="eyebrow">Portals</p>${nav("ride.html", "Ride dispatch", "car", "ride", true)}${nav("freight.html", "Freight logistics", "box", "freight", true)}${nav("track.html", "Live tracking", "pin", "track", true)}</div></nav><div class="sidebar-bottom"><div class="user-menu"><span class="avatar">${esc(initials(get("name")))}</span><div class="user-copy"><strong>${esc(get("name") || "Operations account")}</strong><small>Operations workspace</small></div></div><button class="sidebar-signout" id="signout" data-signout>${icon("logout")} Sign out</button></div>`;
+    document.querySelectorAll("[data-signout]").forEach((button) => {
+      button.onclick = signOut;
     });
     document.querySelectorAll("[data-menu]").forEach(
       (button) =>
@@ -248,6 +299,7 @@
     icons,
     get,
     save,
+    signOut,
     api,
     shell,
     toast,
