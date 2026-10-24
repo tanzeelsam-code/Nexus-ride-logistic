@@ -51,6 +51,18 @@
     polling = false,
     tripVersion = 0,
     quoteVersion = 0;
+  let afterSignIn = null;
+  function openSignIn(action) {
+    afterSignIn = typeof action === "function" ? action : null;
+    if (!$("auth").open) $("auth").showModal();
+  }
+  $("open-signin").onclick = () => openSignIn();
+  $("close-signin").onclick = () => $("auth").close();
+  function needsSignIn(action) {
+    if (session.get("token")) return false;
+    openSignIn(action);
+    return true;
+  }
   const points = { pickup: null, dropoff: null };
   const session = NexoraSession("nexora_customer", signedOut);
   const request = (path, body, headers) =>
@@ -82,8 +94,21 @@
     paymentElements = null;
     paymentId = null;
     quoteVersion++;
-    $("account").hidden = true;
-    $("auth").hidden = false;
+    $("account-bar").hidden = true;
+    $("history-section").hidden = true;
+    $("open-signin").hidden = false;
+    $("ride").hidden = false;
+    invalidateQuote();
+    for (const kind of ["pickup", "dropoff"]) {
+      points[kind] = null;
+      $(kind + "-address").value = "";
+      $(kind + "-results").replaceChildren();
+      marker(kind, null);
+    }
+    marker("driver", null);
+    drawRoute(null);
+    mapPlaceholder(false);
+    NexoraUI.stepper($("ride-steps"), 1);
     $("current").hidden = true;
     $("history").replaceChildren();
     error("login-error", "Please sign in to continue.");
@@ -100,6 +125,14 @@
     $("payment-method").disabled = false;
     $("confirm-booking").textContent = "Confirm ride";
     session.set("pending_booking", null);
+    $("ride").hidden = false;
+    drawRoute(null);
+    NexoraUI.stepper($("ride-steps"), 1);
+  }
+  function mapPlaceholder(hidden) {
+    $("map-empty").hidden = hidden;
+    $("journey-map").inert = !hidden;
+    $("journey-map").setAttribute("aria-hidden", String(!hidden));
   }
   function ensureMap() {
     if (map) return;
@@ -109,11 +142,23 @@
       return;
     }
     map = L.map("journey-map").setView([25, 20], 2);
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      maxZoom: 19,
-    }).addTo(map);
+    const tiles = L.tileLayer(
+      "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      {
+        referrerPolicy: "strict-origin",
+        errorTileUrl: "/assets/map-unavailable.svg",
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19,
+      },
+    ).addTo(map);
+    tiles.on("tileerror", () => {
+      $("map-caption").textContent =
+        "Map background unavailable. Use address search to choose stops; your route and booking details remain available.";
+      pickMode = null;
+      for (const kind of ["pickup", "dropoff"])
+        $("pin-" + kind).disabled = true;
+    });
     map.on("click", async (event) => {
       if (!pickMode) return;
       const kind = pickMode;
@@ -178,6 +223,7 @@
       }).addTo(map);
   }
   function selectPlace(kind, place) {
+    mapPlaceholder(true);
     points[kind] = place;
     $(kind + "-address").value = place.address;
     $(kind + "-results").replaceChildren();
@@ -192,6 +238,7 @@
   for (const kind of ["pickup", "dropoff"]) {
     $("search-" + kind).addEventListener("click", () =>
       busy($("search-" + kind), async () => {
+        if (needsSignIn(() => $("search-" + kind).click())) return;
         const input = $(kind + "-address"),
           q = input.value.trim();
         if (q.length < 3)
@@ -216,6 +263,7 @@
     );
     $(kind + "-address").addEventListener("input", () => {
       points[kind] = null;
+      $(kind + "-results").replaceChildren();
       marker(kind, null);
       invalidateQuote();
     });
@@ -226,6 +274,8 @@
       }
     });
     $("pin-" + kind).addEventListener("click", () => {
+      if (needsSignIn(() => $("pin-" + kind).click())) return;
+      mapPlaceholder(true);
       ensureMap();
       if (!map)
         return error(
@@ -244,6 +294,7 @@
   }
   $("locate").addEventListener("click", () =>
     busy($("locate"), async () => {
+      if (needsSignIn(() => $("locate").click())) return;
       if (!navigator.geolocation)
         throw new Error(
           "Location is unavailable. Search for your pickup instead.",
@@ -284,6 +335,11 @@
     event.preventDefault();
     busy($("estimate"), async () => {
       error("ride-error", "");
+      if (needsSignIn(() => $("ride").requestSubmit())) return;
+      if (!config.booking_available)
+        throw new Error(
+          "New bookings are not available yet. You can still plan your route.",
+        );
       if (!points.pickup || !points.dropoff)
         throw new Error(
           "Choose both addresses from the search results, or place both pins on the map.",
@@ -312,8 +368,12 @@
       $("quote-expiry").textContent =
         "This fare is held for 5 minutes. Traffic can change your arrival time.";
       $("quote").hidden = false;
+      $("ride").hidden = true;
+      NexoraUI.stepper($("ride-steps"), 2);
       $("payment-method").value = "cash";
       $("confirm-booking").textContent = "Confirm ride";
+      $("map-caption").textContent =
+        "Your selected route · Arrival time may vary with traffic.";
       drawRoute(price.route.geometry);
       fitMap();
       $("quote").scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -445,6 +505,8 @@
       const { trip: t } = await request("/trips/" + encodeURIComponent(id));
       if (id !== currentId || version !== tripVersion) return;
       const active = activeStatuses.includes(t.status);
+      mapPlaceholder(true);
+      NexoraUI.stepper($("ride-steps"), active ? 3 : 1);
       $("ride").hidden = active;
       $("current").hidden = false;
       $("current").innerHTML =
@@ -476,6 +538,15 @@
       );
       $("cancel-ride")?.addEventListener("click", () =>
         busy($("cancel-ride"), async () => {
+          if (
+            !(await NexoraUI.ask({
+              title: "Cancel this ride?",
+              message:
+                "Your driver will be notified. Any unused card hold will be released.",
+              confirm: "Cancel ride",
+            }))
+          )
+            return;
           await request("/trips/" + id + "/cancel", {});
           await showTrip();
           await history();
@@ -559,15 +630,21 @@
     error("login-error", "");
   });
   async function start() {
-    $("auth").hidden = true;
-    $("account").hidden = false;
+    if ($("auth").open) $("auth").close();
+    $("account-bar").hidden = false;
+    $("history-section").hidden = false;
+    $("open-signin").hidden = true;
     $("name").textContent = session.get("name") || "there";
     error("login-error", "");
     ensureMap();
     map?.invalidateSize();
     config = await request("/config");
     $("estimate").disabled = !config.booking_available;
-    if (!config.booking_available) error("location-message", "New bookings are not available yet. You can still view your existing rides and receipts.");
+    if (!config.booking_available)
+      error(
+        "location-message",
+        "New bookings are not available yet. You can still view your existing rides and receipts.",
+      );
     $("card-option").disabled = !config.card_payments;
     $("card-option").textContent = config.card_payments
       ? "Card"
@@ -582,6 +659,8 @@
         session.set("pending_booking", null);
       else if (saved.quote) {
         $("quote").hidden = false;
+        $("ride").hidden = true;
+        NexoraUI.stepper($("ride-steps"), 2);
         $("fare").textContent = money(
           saved.quote.price_estimate.total_fare,
           saved.quote.price_estimate.currency,
@@ -614,7 +693,14 @@
         }
         session.save(data);
         form.reset();
+        if (new URLSearchParams(location.search).get("next") === "delivery") {
+          location.replace("/freight.html");
+          return;
+        }
         await start();
+        const action = afterSignIn;
+        afterSignIn = null;
+        if (action) action();
       } catch (err) {
         error(messageId, err);
       } finally {
@@ -628,5 +714,58 @@
     if (!document.hidden && currentId)
       showTrip().catch((err) => error("ride-error", err));
   });
+  const draft = NexoraUI.drafts.take("ride");
+  if (draft) {
+    $("pickup-address").value = draft.pickup;
+    $("dropoff-address").value = draft.dropoff;
+  }
+  mapPlaceholder(false);
+  ensureMap();
+  function updateDock() {
+    const reviewing = !$("quote").hidden,
+      active = $("ride").hidden && !reviewing;
+    $("ride-dock").hidden = active || $("auth").open;
+    const source = reviewing ? $("confirm-booking") : $("estimate");
+    $("dock-action").disabled = source.disabled;
+    $("dock-action").textContent = source.textContent;
+    $("dock-value").textContent = reviewing
+      ? $("fare").textContent
+      : "Choose your route";
+    $("dock-label").textContent = reviewing ? "Your fare" : "Your next stop";
+  }
+  $("dock-action").onclick = () => {
+    if (!$("quote").hidden) $("confirm-booking").click();
+    else $("ride").requestSubmit();
+  };
+  new MutationObserver(updateDock).observe($("account"), {
+    subtree: true,
+    attributes: true,
+    childList: true,
+    characterData: true,
+  });
+  new MutationObserver(updateDock).observe($("auth"), {
+    attributes: true,
+    attributeFilter: ["open"],
+  });
+  updateDock();
   if (session.get("token")) start().catch((err) => error("ride-error", err));
+  else
+    request("/config")
+      .then((value) => {
+        config = value;
+        $("estimate").disabled = !config.booking_available;
+      })
+      .catch(() => {
+        config = {};
+        $("estimate").disabled = true;
+        error(
+          "ride-error",
+          "Booking availability could not be checked. Please refresh to try again.",
+        );
+      });
+  if (location.hash === "#signin" || location.hash === "#register") {
+    openSignIn();
+    if (location.hash === "#register")
+      $("registration").closest("details").open = true;
+  }
 })();

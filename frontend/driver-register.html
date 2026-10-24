@@ -5,12 +5,20 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Driver registration · Nexora</title>
     <link rel="stylesheet" href="portal.css" />
+    <script defer src="/ui.js"></script>
   </head>
   <body>
     <main>
-      <nav>
-        <a href="/">nexora</a><a href="customer.html">Ride with us</a
-        ><a href="driver.html">For drivers</a><a href="admin.html">Workspace</a>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="/" aria-label="Nexora home"
+          >nexora<span class="brand-dot">.</span></a
+        >
+        <div class="nav-links">
+          <a href="/customer.html">Book a ride</a
+          ><a href="/freight.html">Send a package</a
+          ><a href="/help.html">Help</a>
+        </div>
+        <a class="nav-account" href="/customer.html#signin">Sign in</a>
       </nav>
       <p class="eyebrow">A new road ahead</p>
       <h1>Let’s get you moving.</h1>
@@ -112,6 +120,7 @@
         </p>
         <a class="button" href="driver.html">Open driver app</a>
       </section>
+      <footer data-site-footer></footer>
     </main>
     <script src="portal.js"></script>
   </body>

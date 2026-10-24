@@ -1,12 +1,285 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#21634c"><title>Your deliveries · Nexora</title><link rel="stylesheet" href="/portal.css"><link rel="stylesheet" href="/customer.css"><script defer src="/session.js"></script><script defer src="/freight.js"></script><script defer src="/availability.js"></script></head>
-<body><main>
-<nav aria-label="Main navigation"><a href="/">nexora</a><a href="/customer.html">Your rides</a><a href="/freight.html" aria-current="page">Deliveries</a><a href="/driver.html">For drivers</a><a href="/account-recovery.html">Account recovery</a></nav><p data-booking-availability role="status">Checking booking availability…</p>
-<div class="page-intro"><span class="eyebrow">From your hands to theirs</span><h1>Send something their way.</h1><p>Review the fare, share a tracking link, and confirm delivery with a PIN and signature.</p></div>
-<form id="login" class="card"><h2>Sign in to send a package</h2><label>Email<input name="email" type="email" autocomplete="username" required></label><label>Password<input name="password" type="password" autocomplete="current-password" required></label><button>Sign in</button><p id="login-error" class="error" role="alert"></p><p><a href="/customer.html">Create a customer account</a> · <a href="/account-recovery.html">Recover your account</a></p></form>
-<div id="account" hidden><div class="account-bar"><span>Hello, <strong id="name"></strong></span><button id="logout" class="secondary">Sign out</button></div><p id="availability" role="status"></p>
-<div class="freight-layout"><form id="delivery" class="card"><span class="eyebrow">01 · Your package</span><h2>Choose the stops</h2>
-<label for="pickup-address">Pickup address</label><div class="address-search"><input id="pickup-address" name="pickup_address" required maxlength="200" autocomplete="off" placeholder="Street, building, or landmark"><button type="button" id="search-pickup" class="secondary">Search</button></div><div id="pickup-results" class="place-results" aria-label="Pickup search results"></div><div class="grid"><label>Sender name<input name="pickup_contact_name" required maxlength="100" autocomplete="off"></label><label>Sender phone<input name="pickup_contact_phone" type="tel" required minlength="8" maxlength="20" autocomplete="off"></label></div><label for="dropoff-address">Destination address</label><div class="address-search"><input id="dropoff-address" name="dropoff_address" required maxlength="200" autocomplete="off" placeholder="Street, building, or landmark"><button type="button" id="search-dropoff" class="secondary">Search</button></div><div id="dropoff-results" class="place-results" aria-label="Destination search results"></div><div class="grid"><label>Recipient name<input name="dropoff_contact_name" required maxlength="100" autocomplete="off"></label><label>Recipient phone<input name="dropoff_contact_phone" type="tel" required minlength="8" maxlength="20" autocomplete="off"></label></div>
-<label>What are you sending?<input name="cargo_description" required maxlength="500" placeholder="Describe the package"></label><label>Weight in kilograms<input name="cargo_weight_kg" type="number" min="0.1" max="10000" step="0.1" value="1" required></label><label><input name="is_fragile" type="checkbox"> Handle with care</label><p>For ready-to-collect packages. The recipient pays the delivery fee in cash on arrival. Confirm they can pay before booking. Insurance and scheduled pickup are unavailable.</p><button id="estimate">Check delivery fare →</button><p id="delivery-error" class="error" role="alert"></p></form>
-<section class="card"><span class="eyebrow">02 · Review and send</span><h2>A clear delivery fare</h2><p id="quote-placeholder">Choose both addresses from the search results to get a road-based quote.</p><div id="quote" hidden><strong id="fare" class="fare"></strong><p id="quote-detail"></p><p>Cash paid by the recipient at delivery. Share the delivery PIN only when the package arrives.</p><button id="confirm">Confirm delivery</button></div><p id="booking-message" role="status"></p></section></div>
-<section class="card"><div class="account-bar"><h2>Your deliveries</h2><button id="refresh" class="secondary">Refresh</button></div><p id="history-error" role="alert"></p><div id="history"></div></section></div></main></body></html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#21634c" />
+    <title>Send a package · Nexora</title>
+    <link rel="stylesheet" href="/portal.css" />
+    <link rel="stylesheet" href="/customer.css" />
+    <script defer src="/ui.js"></script>
+    <script defer src="/session.js"></script>
+    <script defer src="/freight.js"></script>
+    <script defer src="/availability.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#delivery">Skip to booking</a>
+    <main>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="/" aria-label="Nexora home"
+          >nexora<span class="brand-dot">.</span></a
+        >
+        <div class="nav-links">
+          <a href="/customer.html">Book a ride</a
+          ><a href="/freight.html" aria-current="page">Send a package</a
+          ><a href="/help.html">Help</a>
+        </div>
+        <button id="open-signin" class="secondary">Sign in</button>
+      </nav>
+      <p class="availability-banner" data-booking-availability role="status">
+        Checking booking availability…
+      </p>
+      <div class="page-intro">
+        <span class="eyebrow">A LITTLE CLOSER, DOOR TO DOOR</span>
+        <h1>Send something their way.</h1>
+        <p>A few details. A clear fare. A handoff you can follow.</p>
+      </div>
+      <dialog id="auth" class="nexora-dialog" aria-labelledby="auth-title">
+        <button
+          id="close-signin"
+          class="dialog-close"
+          type="button"
+          aria-label="Close sign in"
+        >
+          ×
+        </button>
+        <form id="login">
+          <h2 id="auth-title">Keep your delivery together.</h2>
+          <p>Sign in to search addresses and book. Your details stay here.</p>
+          <label
+            >Email<input
+              name="email"
+              type="email"
+              autocomplete="username"
+              required /></label
+          ><label
+            >Password<input
+              name="password"
+              type="password"
+              autocomplete="current-password"
+              required /></label
+          ><button>Sign in</button>
+          <p id="login-error" class="error" role="alert"></p>
+          <p>
+            <a id="create-account" href="/customer.html?next=delivery#register"
+              >Create an account</a
+            >
+            · <a href="/account-recovery.html">Forgot password?</a>
+          </p>
+        </form>
+      </dialog>
+      <div id="account">
+        <div class="account-bar" id="account-bar" hidden>
+          <span>Hello, <strong id="name"></strong></span
+          ><button id="logout" class="secondary">Sign out</button>
+        </div>
+        <ol
+          class="booking-steps"
+          id="delivery-steps"
+          aria-label="Delivery progress"
+        >
+          <li data-step="1" aria-current="step"><span>1</span> Route</li>
+          <li data-step="2"><span>2</span> Package & contacts</li>
+          <li data-step="3"><span>3</span> Review</li>
+        </ol>
+        <div class="freight-layout">
+          <form id="delivery" class="card" novalidate>
+            <section class="delivery-step" data-panel="1">
+              <span class="eyebrow">01 / THE JOURNEY</span>
+              <h2 tabindex="-1">Where’s it going?</h2>
+              <p>Search for an address, then choose the matching result.</p>
+              <label for="pickup-address">Pickup address</label>
+              <div class="address-search">
+                <input
+                  id="pickup-address"
+                  name="pickup_address"
+                  required
+                  maxlength="200"
+                  autocomplete="off"
+                  placeholder="Street, building, or landmark"
+                /><button type="button" id="search-pickup" class="secondary">
+                  Search
+                </button>
+              </div>
+              <div
+                id="pickup-results"
+                class="place-results"
+                aria-label="Pickup address search results"
+                aria-live="polite"
+              ></div>
+              <label for="dropoff-address">Delivery address</label>
+              <div class="address-search">
+                <input
+                  id="dropoff-address"
+                  name="dropoff_address"
+                  required
+                  maxlength="200"
+                  autocomplete="off"
+                  placeholder="Where should we deliver?"
+                /><button type="button" id="search-dropoff" class="secondary">
+                  Search
+                </button>
+              </div>
+              <div
+                id="dropoff-results"
+                class="place-results"
+                aria-label="Delivery address search results"
+                aria-live="polite"
+              ></div>
+              <div class="step-actions">
+                <button type="button" class="primary" id="to-details">
+                  Continue to package →
+                </button>
+              </div>
+            </section>
+            <section class="delivery-step" data-panel="2" hidden>
+              <span class="eyebrow">02 / THE DETAILS</span>
+              <h2 tabindex="-1">A little about your package.</h2>
+              <label
+                >What are you sending?<input
+                  name="cargo_description"
+                  required
+                  maxlength="500"
+                  placeholder="For example, a box of books"
+              /></label>
+              <div class="grid">
+                <label
+                  >Weight in kilograms<input
+                    name="cargo_weight_kg"
+                    type="number"
+                    min="0.1"
+                    max="10000"
+                    step="0.1"
+                    value="1"
+                    required /></label
+                ><label class="check-label"
+                  ><input name="is_fragile" type="checkbox" /> Handle with
+                  care</label
+                >
+              </div>
+              <h3>Who’s handing it over?</h3>
+              <div class="grid">
+                <label
+                  >Sender name<input
+                    name="pickup_contact_name"
+                    required
+                    maxlength="100"
+                    autocomplete="off" /></label
+                ><label
+                  >Sender phone<input
+                    name="pickup_contact_phone"
+                    type="tel"
+                    required
+                    minlength="8"
+                    maxlength="20"
+                    autocomplete="off"
+                    placeholder="Include country code"
+                /></label>
+              </div>
+              <h3>Who’s receiving it?</h3>
+              <div class="grid">
+                <label
+                  >Recipient name<input
+                    name="dropoff_contact_name"
+                    required
+                    maxlength="100"
+                    autocomplete="off" /></label
+                ><label
+                  >Recipient phone<input
+                    name="dropoff_contact_phone"
+                    type="tel"
+                    required
+                    minlength="8"
+                    maxlength="20"
+                    autocomplete="off"
+                    placeholder="Include country code"
+                /></label>
+              </div>
+              <p class="fare-footnote">
+                Ready-to-collect packages only. The recipient pays the delivery
+                fee in cash on arrival. Please confirm they can pay. Scheduled
+                pickup and insurance are unavailable.
+              </p>
+              <div class="step-actions">
+                <button type="button" class="secondary" data-back="1">
+                  Back</button
+                ><button type="submit" class="primary" id="estimate">
+                  Check delivery fare →
+                </button>
+              </div>
+            </section>
+            <section class="delivery-step" data-panel="3" hidden>
+              <span class="eyebrow">03 / READY TO SEND</span>
+              <h2 tabindex="-1">Everything look right?</h2>
+              <div id="quote" hidden>
+                <strong id="fare" class="fare"></strong>
+                <p id="quote-detail"></p>
+                <dl id="review-details" class="review-grid"></dl>
+                <p class="fare-footnote">
+                  The recipient pays cash on arrival. Share the delivery PIN
+                  only when the package arrives.
+                </p>
+                <div class="step-actions">
+                  <button type="button" class="secondary" data-back="2">
+                    Edit details</button
+                  ><button type="button" class="primary" id="confirm">
+                    Confirm delivery
+                  </button>
+                </div>
+              </div>
+            </section>
+            <p id="delivery-error" class="error" role="alert"></p>
+          </form>
+          <aside class="delivery-review" aria-label="Delivery summary">
+            <img
+              src="/assets/delivery.svg"
+              width="320"
+              height="180"
+              alt=""
+            /><span class="eyebrow">YOUR DELIVERY</span>
+            <h3>From pickup to handoff.</h3>
+            <p>
+              Your quote appears after you add the package and contact details.
+            </p>
+            <dl>
+              <div>
+                <dt>FROM</dt>
+                <dd id="summary-pickup">Choose pickup</dd>
+              </div>
+              <div>
+                <dt>TO</dt>
+                <dd id="summary-dropoff">Choose destination</dd>
+              </div>
+            </dl>
+            <p>
+              Track the journey with a shareable link. Confirm arrival with a
+              PIN and recipient signature.
+            </p>
+            <a href="/help.html#deliveries">How delivery works →</a>
+          </aside>
+        </div>
+        <section class="card" id="history-section" hidden>
+          <p id="booking-message" role="status"></p>
+          <div class="section-heading">
+            <h2>Your deliveries</h2>
+            <div>
+              <button type="button" class="secondary" id="new-delivery" hidden>
+                Send another package</button
+              ><button id="refresh" class="secondary">Refresh</button>
+            </div>
+          </div>
+          <p id="history-error" class="error" role="alert"></p>
+          <div id="history"></div>
+        </section>
+      </div>
+      <div class="booking-dock" id="delivery-dock">
+        <div>
+          <small id="dock-label">Your delivery</small
+          ><strong id="dock-value">Choose your stops</strong>
+        </div>
+        <button type="button" id="dock-action">Continue →</button>
+      </div>
+      <footer data-site-footer></footer>
+    </main>
+  </body>
+</html>

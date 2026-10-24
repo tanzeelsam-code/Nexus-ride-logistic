@@ -1,3 +1,4 @@
+@import url("brand.css");
 :root {
   --bg: #f5f6f0;
   --card-bg: #fff;
@@ -19,7 +20,7 @@
 }
 
 body {
-  font-family: "Plus Jakarta Sans", sans-serif;
+  font-family: var(--body-font);
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
@@ -116,7 +117,8 @@ body {
   font-weight: 800;
   color: var(--text);
   margin: 6px 0;
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--heading-font);
+  font-variant-numeric: tabular-nums;
 }
 
 .earnings-stats {
@@ -161,7 +163,8 @@ body {
 }
 
 .payout-pill {
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--heading-font);
+  font-variant-numeric: tabular-nums;
   font-size: 14px;
   font-weight: 700;
   color: var(--success);
@@ -417,4 +420,257 @@ input:focus-visible {
 .btn-row .btn-action {
   flex: 1;
   min-width: 120px;
+}
+
+/* Shared brand and accessible controls */
+body {
+  line-height: 1.6;
+  padding: 24px;
+  color: var(--ink);
+}
+h1,
+h2,
+h3,
+.driver-brand {
+  font-family: var(--heading-font);
+}
+h1 {
+  font-size: 30px;
+  line-height: 1.2;
+  letter-spacing: -1px;
+}
+.eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.6px;
+  color: var(--muted);
+}
+.driver-brand {
+  max-width: 760px;
+  padding: 8px 0 28px;
+}
+.driver-brand a:first-child {
+  font-size: 30px;
+}
+.brand-dot {
+  color: #8aa974;
+}
+.mobile-frame {
+  max-width: 760px;
+}
+.job-card,
+.earnings-card,
+.driver-header {
+  border-radius: 20px;
+  padding: 24px;
+}
+.job-card p {
+  font-size: 14px;
+  color: var(--muted);
+}
+.job-card h3 {
+  margin: 8px 0;
+}
+.driver-avatar {
+  background: var(--green-soft);
+  border: 0;
+  color: var(--green);
+}
+.driver-avatar .icon {
+  width: 26px;
+  height: 26px;
+}
+.status-toggle {
+  min-height: 44px;
+  font: 700 13px var(--body-font);
+  background: var(--green-soft);
+  color: var(--green) !important;
+  border: 1px solid #cedfcd;
+  white-space: nowrap;
+}
+.status-toggle[aria-pressed="true"] {
+  background: var(--green);
+  color: white !important;
+}
+.earnings-card {
+  margin-top: 18px;
+}
+.earnings-val {
+  font-size: 40px;
+  letter-spacing: -1.5px;
+}
+.earnings-stats {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.earnings-card + .job-card {
+  margin-top: 18px;
+}
+.input-group input {
+  font-size: 16px;
+  min-height: 48px;
+}
+.location-details {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.location-details summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  color: var(--green);
+  font-weight: 600;
+}
+.location-details summary:after {
+  content: "+";
+  margin-left: auto;
+}
+.location-details[open] summary:after {
+  content: "−";
+}
+.location-details p {
+  margin-bottom: 16px;
+}
+.recovery-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 13px;
+}
+.section-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+.section-heading .icon {
+  color: var(--green);
+}
+.job-type-pill {
+  font-size: 11px;
+}
+.payout-pill {
+  font-size: 16px;
+}
+.btn-action {
+  border-radius: 12px;
+  min-height: 48px;
+  font-family: var(--body-font);
+}
+.btn-action:hover {
+  transform: none;
+  background: #184c3a;
+}
+.btn-row {
+  gap: 10px;
+}
+.driver-footer {
+  max-width: 760px;
+  width: 100%;
+}
+.link-btn {
+  min-height: 44px;
+  font-size: 13px;
+}
+.notification-controls p {
+  margin-top: 10px;
+}
+.clear-btn {
+  min-height: 44px;
+  font-size: 12px;
+  padding: 8px 12px;
+}
+.job-badge-row {
+  gap: 12px;
+  flex-wrap: wrap;
+}
+#pod-modal {
+  position: fixed;
+  inset: 0;
+  width: calc(100% - 32px);
+  max-width: 480px;
+  padding: 0;
+  background: white;
+  backdrop-filter: none;
+  max-height: calc(100dvh - 32px);
+  border: 1px solid var(--line);
+  display: none;
+}
+#pod-modal[open] {
+  display: block;
+}
+#pod-modal .pod-dialog {
+  max-width: none;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  padding: 28px;
+  background: white;
+}
+#pod-modal h2 {
+  font-size: 25px;
+}
+#pod-modal p {
+  margin: 0;
+  font-size: 14px;
+}
+#pod-modal .input-group {
+  margin: 0;
+}
+#pod-cash-row {
+  display: flex;
+  align-items: start;
+  gap: 12px;
+  font-size: 14px;
+}
+#pod-cash {
+  width: 20px;
+  height: 20px;
+  min-height: 20px;
+  flex: none;
+}
+.pod-dialog label {
+  margin: 0;
+}
+#sig-pad {
+  display: block;
+}
+.error-text {
+  font-size: 13px;
+}
+@media (max-width: 600px) {
+  body {
+    padding: 18px 20px;
+  }
+  .driver-header,
+  .job-card,
+  .earnings-card {
+    padding: 20px;
+  }
+  .driver-header {
+    gap: 10px;
+  }
+  .driver-profile {
+    gap: 10px;
+  }
+  .driver-avatar {
+    width: 40px;
+    height: 40px;
+  }
+  .driver-profile h2 {
+    font-size: 15px !important;
+  }
+  .status-toggle {
+    padding: 8px 12px;
+  }
+  .earnings-val {
+    font-size: 36px;
+  }
+  .earnings-stats {
+    font-size: 12px;
+  }
+  .payout-pill {
+    font-size: 15px;
+  }
 }

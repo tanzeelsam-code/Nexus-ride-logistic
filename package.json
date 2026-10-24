@@ -17,7 +17,8 @@
     "test:workspace": "node --test scripts/workspace-session.test.cjs",
     "test:e2e": "node scripts/e2e.js",
     "test:integrations": "node --test scripts/integrations.test.cjs scripts/customer-session.test.cjs scripts/payments-integration.test.cjs scripts/release-integration.test.cjs",
-    "test:ai": "python3 -m unittest discover -s scripts -p \"test_ai_baseline.py\""
+    "test:ai": "python3 -m unittest discover -s scripts -p \"test_ai_baseline.py\"",
+    "test:ui": "node --test scripts/booking-ui.test.cjs"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",
@@ -39,6 +40,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "jsdom": "^30.1.3",
     "socket.io-client": "^4.8.4",
     "wrangler": "^4.152.0"
   },

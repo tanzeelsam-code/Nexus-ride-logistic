@@ -87,6 +87,8 @@
     if (!map) {
       map = L.map("map", { zoomControl: false });
       L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        referrerPolicy: "strict-origin",
+        errorTileUrl: "/assets/map-unavailable.svg",
         maxZoom: 19,
         attribution:
           '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',

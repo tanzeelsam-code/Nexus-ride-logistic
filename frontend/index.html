@@ -4,78 +4,253 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#21634c" />
-    <title>Nexora · A little closer</title>
-    <link rel="stylesheet" href="portal.css" />
-  <script defer src="/availability.js"></script></head>
+    <meta
+      name="description"
+      content="Plan a ride or send a package with Nexora. Choose your stops, review your fare, and follow the journey."
+    />
+    <title>Nexora · Your city, a little closer</title>
+    <link rel="stylesheet" href="/portal.css" />
+    <script defer src="/ui.js"></script>
+    <script defer src="/home.js"></script>
+    <script defer src="/availability.js"></script>
+  </head>
   <body>
-    <main>
-      <nav aria-label="Main navigation">
-        <a href="/">nexora</a><a href="customer.html">Ride with us</a
-        ><a href="driver.html">For drivers</a><a href="admin.html">Workspace</a>
-      <a href="/account-recovery.html">Account recovery</a><a href="/freight.html">Send a package</a></nav><p data-booking-availability role="status">Checking booking availability…</p>
-      <section class="home-hero">
-        <div>
-          <span class="eyebrow">People. Places. Possibilities.</span>
-          <h1>Your next stop,<br />a little closer.</h1>
-          <p>
-            Across the city or on your daily route. Get where you need to go
-            with Nexora.
-          </p>
-          <a class="button" href="customer.html"
-            >Find your ride <span aria-hidden="true">→</span></a
-          >
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <main id="main-content">
+      <nav class="site-nav" aria-label="Main navigation">
+        <a class="brand" href="/" aria-label="Nexora home"
+          >nexora<span class="brand-dot">.</span></a
+        >
+        <div class="nav-links">
+          <a href="/customer.html">Book a ride</a
+          ><a href="/freight.html">Send a package</a
+          ><a href="/help.html">Help</a>
         </div>
-        <div class="journey-card">
-          <span class="eyebrow">Made for your everyday</span>
-          <h2>Good journeys start here.</h2>
-          <div class="journey-dots">
-            <div class="journey-stop">
-              <span class="stop-dot"></span>
-              <div><small>YOUR PICKUP</small>Wherever the day begins</div>
+        <a class="nav-account" href="/customer.html#signin"
+          >Sign in
+          <svg class="icon" aria-hidden="true">
+            <use href="/assets/icons.svg#user" /></svg
+        ></a>
+      </nav>
+      <p class="availability-banner" data-booking-availability role="status">
+        Checking booking availability…
+      </p>
+      <section class="booking-hero">
+        <div class="hero-copy">
+          <span class="eyebrow"
+            >STARTING IN <span data-service-areas>Chitral</span></span
+          >
+          <h1>Your city.<br />A little closer.</h1>
+          <p>
+            A ride across town. A package to their door.<br />One place to get
+            things moving.
+          </p>
+          <form id="start-journey" class="home-booking">
+            <div
+              class="service-switch"
+              role="group"
+              aria-label="Choose a service"
+            >
+              <button type="button" data-service="ride" aria-pressed="true">
+                <svg class="icon" aria-hidden="true">
+                  <use href="/assets/icons.svg#car" />
+                </svg>
+                Book a ride</button
+              ><button
+                type="button"
+                data-service="delivery"
+                aria-pressed="false"
+              >
+                <svg class="icon" aria-hidden="true">
+                  <use href="/assets/icons.svg#box" />
+                </svg>
+                Send a package
+              </button>
             </div>
-            <div class="journey-stop">
-              <span class="stop-dot end"></span>
-              <div><small>YOUR DESTINATION</small>Where you need to be</div>
+            <div class="stop-fields">
+              <label
+                ><span>Pickup address</span
+                ><input
+                  name="pickup"
+                  placeholder="Where from?"
+                  autocomplete="off"
+                  required
+                  maxlength="200" /></label
+              ><button
+                id="swap-stops"
+                class="swap-button"
+                type="button"
+                aria-label="Swap pickup and destination"
+              >
+                <svg class="icon" aria-hidden="true">
+                  <use href="/assets/icons.svg#swap" />
+                </svg></button
+              ><label
+                ><span id="destination-label">Where to?</span
+                ><input
+                  name="dropoff"
+                  placeholder="Street, building, or landmark"
+                  autocomplete="off"
+                  required
+                  maxlength="200"
+              /></label>
+            </div>
+            <button class="wide primary" type="submit">
+              <span id="start-label">Continue with ride</span
+              ><svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#arrow" />
+              </svg>
+            </button>
+            <p id="booking-hint" class="form-hint">
+              Choose your stops. Review the fare before you book.
+            </p>
+            <p id="draft-error" class="error" role="alert"></p>
+          </form>
+        </div>
+        <div
+          class="hero-scene"
+          aria-label="Illustration of a journey across a city"
+        >
+          <img
+            src="/assets/route.svg"
+            width="620"
+            height="620"
+            alt=""
+            class="route-art"
+          />
+          <div class="scene-label scene-top">
+            <span class="icon-tile"
+              ><svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#pin" /></svg
+            ></span>
+            <div>
+              <small>A GOOD PLACE TO START</small
+              ><strong>Right where you are.</strong>
             </div>
           </div>
-          <p class="journey-note">
-            A personal pickup PIN. A driver you can follow.
+          <div class="scene-car">
+            <img
+              src="/assets/ride.svg"
+              width="320"
+              height="180"
+              alt="Nexora green car illustration"
+            />
+          </div>
+          <div class="scene-label scene-bottom">
+            <span class="icon-tile"
+              ><svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#shield" /></svg
+            ></span>
+            <div>
+              <strong>Your journey. Your PIN.</strong
+              ><small>A personal code for every pickup</small>
+            </div>
+          </div>
+          <span class="illustration-label"
+            >Illustration · your route appears when you book</span
+          >
+        </div>
+      </section>
+      <section class="services-section" aria-labelledby="services-title">
+        <div class="section-title-row">
+          <div>
+            <span class="eyebrow">TWO WAYS TO GO</span>
+            <h2 id="services-title">What’s moving today?</h2>
+          </div>
+          <p>For you. For the things that matter.</p>
+        </div>
+        <div class="service-cards">
+          <a class="service-card" href="/customer.html"
+            ><div>
+              <span class="service-number">01 / RIDE</span>
+              <h3>A seat for your next stop.</h3>
+              <p>Plan your route, review the fare, and follow your driver.</p>
+              <span class="service-link"
+                >Book a ride
+                <svg class="icon" aria-hidden="true">
+                  <use href="/assets/icons.svg#arrow" /></svg
+              ></span>
+            </div>
+            <img
+              src="/assets/ride.svg"
+              alt=""
+              width="320"
+              height="180"
+              loading="lazy" /></a
+          ><a class="service-card package-card" href="/freight.html"
+            ><div>
+              <span class="service-number">02 / SEND</span>
+              <h3>From your hands to theirs.</h3>
+              <p>A tracking link, handoff PINs, and a signature on arrival.</p>
+              <span class="service-link"
+                >Send a package
+                <svg class="icon" aria-hidden="true">
+                  <use href="/assets/icons.svg#arrow" /></svg
+              ></span>
+            </div>
+            <img
+              src="/assets/delivery.svg"
+              alt=""
+              width="320"
+              height="180"
+              loading="lazy"
+          /></a>
+        </div>
+      </section>
+      <section class="confidence-grid" aria-label="What to expect">
+        <article>
+          <svg class="icon" aria-hidden="true">
+            <use href="/assets/icons.svg#check" />
+          </svg>
+          <h3>Know the fare first</h3>
+          <p>Review your quote and payment method before confirming.</p>
+        </article>
+        <article>
+          <svg class="icon" aria-hidden="true">
+            <use href="/assets/icons.svg#shield" />
+          </svg>
+          <h3>A more certain handoff</h3>
+          <p>
+            Check your driver and vehicle. Share your PIN when you’re ready.
+          </p>
+        </article>
+        <article>
+          <svg class="icon" aria-hidden="true">
+            <use href="/assets/icons.svg#help" />
+          </svg>
+          <h3>Help, close at hand</h3>
+          <p>Find booking guidance, recovery steps, and safety information.</p>
+          <a href="/help.html">Visit the help centre →</a>
+        </article>
+      </section>
+      <section class="coverage-card">
+        <div>
+          <span class="eyebrow">WHERE WE GO</span>
+          <h2>Local journeys start here.</h2>
+          <p data-service-areas>
+            Launch locations have not been announced. Check back here before
+            planning a booking.
           </p>
         </div>
+        <a class="button secondary" href="/help.html#coverage"
+          >Check service areas
+          <svg class="icon" aria-hidden="true">
+            <use href="/assets/icons.svg#arrow" /></svg
+        ></a>
       </section>
-      <section class="home-options">
-        <h2>One network. Your way to move.</h2>
-        <div class="grid">
-          <article class="card">
-            <h3>Ride with Nexora</h3>
-            <p>
-              Create your account, request a ride, and follow your driver from
-              pickup to arrival.
-            </p>
-            <a href="customer.html">Let's get you there →</a>
-          </article>
-          <article class="card">
-            <h3>Your road. Your opportunity.</h3>
-            <p>
-              Join the driver network with your vehicle. Start accepting jobs
-              once your account is approved.
-            </p>
-            <a href="driver-register.html">Become a driver →</a>
-          </article>
-          <article class="card">
-            <h3>Bring it all together</h3>
-            <p>
-              Review drivers and keep an eye on rides, deliveries, and the
-              people behind them.
-            </p>
-            <a href="admin.html">Open your workspace →</a>
-          </article>
+      <section class="driver-invite">
+        <div>
+          <h2>Your road. Your opportunity.</h2>
+          <p>
+            Apply to drive with Nexora. Your account and vehicle are reviewed
+            before you receive jobs.
+          </p>
         </div>
+        <a href="/driver-register.html" class="button secondary"
+          >Become a driver →</a
+        >
       </section>
-      <footer class="home-footer">
-        <span>Nexora · A little more connected.</span
-        ><a href="driver.html">Driver sign in →</a>
-      </footer>
+      <footer data-site-footer></footer>
     </main>
   </body>
 </html>
