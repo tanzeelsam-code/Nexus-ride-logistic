@@ -499,6 +499,9 @@ async function run() {
   await ack('trip:complete', { cash_collected: true, tripId: liveTrip.id, actual_distance_km: 20 });
   await sleep(500);
   check('rider receives the full event sequence', ['trip:driver_offered', 'trip:driver_en_route', 'trip:driver_arrived', 'trip:started', 'trip:completed'].every((e) => events.includes(e)), events);
+  const disconnected = once(rider, 'disconnect');
+  r = await post('/auth/logout', {}, { token: custToken });
+  check('logout disconnects the matching realtime session', r.status === 200 && !!(await disconnected));
   rider.close();
   drvSock.close();
 

@@ -6,15 +6,21 @@ const email = z.string().trim().email().max(254).transform(value => value.toLowe
 const password = z.string().min(12).max(72).refine(value => Buffer.byteLength(value, 'utf8') <= 72, 'Password must be at most 72 bytes');
 const digest = code => crypto.createHash('sha256').update(code).digest('hex');
 
-function registerRecovery({ app, query, transaction, bcrypt, validate, requireDatabase, dummyHash, onRecovered }) {
+function registerRecovery({ app, query, transaction, bcrypt, validate, requireDatabase, dummyHash, onRecovered, cache, maxAttempts, lockoutSeconds }) {
   const options = { preHandler: requireDatabase, config: { rateLimit: { max: 5, timeWindow: 900000 } } };
 
   // Re-authenticate before replacing the offline recovery credential. Store only its hash.
   app.post('/api/v1/auth/recovery-code', options, async (req, reply) => {
     const body = validate(z.object({ email, password: z.string().min(1).max(72) }), req.body);
+    const lockKey = `lockout:${body.email}`;
+    if (Number(await cache.get(lockKey)) >= maxAttempts) return reply.code(429).send({ error: 'Account temporarily locked. Try again later.' });
     const { rows: [user] } = await query('SELECT id,password_hash,is_active,is_banned FROM users WHERE email=$1', [body.email]);
     const valid = await bcrypt.compare(body.password, user?.password_hash || dummyHash);
-    if (!valid || !user?.is_active || user.is_banned) return reply.code(401).send({ error: 'Invalid email or password' });
+    if (!valid || !user?.is_active || user.is_banned) {
+      await cache.incr(lockKey, lockoutSeconds);
+      return reply.code(401).send({ error: 'Invalid email or password' });
+    }
+    await cache.del(lockKey);
     const code = crypto.randomBytes(32).toString('base64url');
     const updated = await query(`UPDATE users SET recovery_code_hash=$1
       WHERE id=$2 AND password_hash=$3 AND is_active AND NOT is_banned RETURNING id`, [digest(code), user.id, user.password_hash]);

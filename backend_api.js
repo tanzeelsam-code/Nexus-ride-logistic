@@ -439,7 +439,8 @@ const kv = {
 const app = Fastify({
   logger: false,  // Using custom pino logger
   pluginTimeout: runtime.edge ? 0 : 10000,
-  trustProxy: true,
+  // Cloudflare overwrites the forwarding header; standalone servers trust only configured proxies.
+  trustProxy: runtime.edge || getEnv('TRUST_PROXY', '').split(',').map(value => value.trim()).filter(Boolean),
   bodyLimit: 5 * 1024 * 1024,  // 5MB
 });
 
@@ -613,7 +614,8 @@ const authenticate = async (req, reply) => {
     req.user = { ...req.user, ...user };
   } catch (err) {
     metrics.authFailuresTotal += 1;
-    return reply.code(401).send({ error: 'Authentication required' });
+    const invalidToken = err.statusCode === 401 || /^(FST_JWT_|FAST_JWT_)/.test(err.code || '');
+    return reply.code(invalidToken ? 401 : 503).send({ error: invalidToken ? 'Authentication required' : 'Authentication is temporarily unavailable. Please try again.' });
   }
 };
 
@@ -1190,6 +1192,12 @@ app.post('/api/v1/auth/login', { preHandler: requireDatabase, config: { rateLimi
 app.post('/api/v1/auth/logout', { preHandler: authenticate }, async (req, reply) => {
   // Blacklist current token
   await kv.setex(`blacklist:${req.user.jti}`, accessTokenTtlSeconds, '1');
+  if (!runtime.edge) {
+    const sockets = await io.in(`user:${req.user.id}`).fetchSockets();
+    for (const socket of sockets) {
+      try { if (app.jwt.verify(socket.accessToken).jti === req.user.jti) socket.disconnect(true); } catch { /* No matching access session. */ }
+    }
+  }
 
   // Optional: revoke refresh token session if provided.
   const refreshToken = req.body?.refresh_token;
@@ -3094,6 +3102,7 @@ const io = runtime.io || new SocketIO({
 });
 
 registerRecovery({ app, query, transaction, bcrypt, validate, requireDatabase, dummyHash: DUMMY_BCRYPT_HASH,
+  cache: Cache, maxAttempts: config.app.maxLoginAttempts, lockoutSeconds: config.app.loginLockoutMinutes * 60,
   onRecovered: async userId => {
     await Cache.del(`user:${userId}`);
     if (!runtime.edge) io.in(`user:${userId}`).disconnectSockets(true);

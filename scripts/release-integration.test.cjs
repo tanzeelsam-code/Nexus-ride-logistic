@@ -25,6 +25,9 @@ test('recovery revokes sessions; freight quotes, receipts and ownership survive 
     assert.equal(r.status,201); const original=r.body;
     const make=()=>call('POST','/auth/recovery-code',credentials);
     r=await call('POST','/auth/recovery-code',{...credentials,password:'incorrect'}); assert.equal(r.status,401);
+    await redis.setex(`lockout:${credentials.email}`,60,'99');
+    assert.equal((await make()).status,429);
+    await redis.del(`lockout:${credentials.email}`);
     const old=(await make()).body.recovery_code;
     r=await make(); assert.equal(r.status,200); assert.equal(r.headers['cache-control'],'no-store'); const code=r.body.recovery_code;
     const stored=(await db.query('SELECT recovery_code_hash FROM users WHERE id=$1',[original.user.id])).rows[0];
@@ -37,6 +40,11 @@ test('recovery revokes sessions; freight quotes, receipts and ownership survive 
     assert.equal((await call('POST','/auth/refresh',{refresh_token:original.refresh_token})).status,401);
     assert.equal((await call('POST','/auth/login',credentials)).status,401);
     r=await call('POST','/auth/login',{...credentials,password:'New-release-password-123'}); assert.equal(r.status,200); const token=r.body.token;
+    const originalQuery=db.query.bind(db);
+    db.query=async(sql,...args)=>{if(String(sql).includes('SELECT id,role,email,phone')) throw new Error('Simulated database outage'); return originalQuery(sql,...args);};
+    assert.equal((await call('GET','/trips',undefined,token)).status,503);
+    db.query=originalQuery;
+    assert.equal((await call('GET','/trips',undefined,token)).status,200);
     const refresh=await Promise.all([1,2].map(()=>call('POST','/auth/refresh',{refresh_token:r.body.refresh_token})));
     assert.deepEqual(refresh.map(r=>r.status).sort(),[200,401]);
     const body={pickup_lat:40.75,pickup_lng:-73.98,pickup_address:'Warehouse',pickup_contact_name:'Sender',pickup_contact_phone:'+15550000001',dropoff_lat:40.76,dropoff_lng:-73.99,dropoff_address:'Office',dropoff_contact_name:'Receiver',dropoff_contact_phone:'+15550000002',cargo_description:'Books',cargo_weight_kg:2};
