@@ -6,3 +6,5 @@
   Strict-Transport-Security: max-age=31536000
 /account-recovery.html
   Cache-Control: no-store
+/account-recovery
+  Cache-Control: no-store
