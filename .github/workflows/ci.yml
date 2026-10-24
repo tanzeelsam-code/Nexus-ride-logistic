@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, "feat/**", "codex/**" ]
   pull_request:
 
 jobs:
@@ -13,9 +13,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: "22.23.4"
           cache: npm
       - run: npm ci
+      - name: Dependency security audit
+        run: npm audit --audit-level=moderate
       - name: Syntax check
         run: node --check backend_api.js
       - name: Start Redis
@@ -58,7 +60,7 @@ jobs:
       - name: Container packaging
         run: |
           docker build -f Dockerfile.api -t nexora-api-ci .
-          docker run --rm nexora-api-ci node -e "require('./backend_api.js'); require('fs').accessSync('supabase/migrations/20261019085513_booking_payments_notifications.sql')"
+          docker run --rm nexora-api-ci node -e "require('./backend_api.js'); require('fs').accessSync('supabase/migrations/20261024093153_release_recovery_cash_billing.sql')"
       - name: No-database smoke check
         run: npm run verify
 

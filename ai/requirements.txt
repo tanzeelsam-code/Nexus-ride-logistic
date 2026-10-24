@@ -1,5 +1,6 @@
-fastapi==0.104.1
-uvicorn==0.24.0
-redis>=5.0,<6
-httpx==0.25.1
-pydantic==2.4.2
+fastapi==0.162.0
+uvicorn==0.54.0
+redis==5.3.1
+httpx==0.28.1
+pydantic==2.14.1
+certifi>=2026.10.19

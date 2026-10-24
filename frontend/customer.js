@@ -566,6 +566,8 @@
     ensureMap();
     map?.invalidateSize();
     config = await request("/config");
+    $("estimate").disabled = !config.booking_available;
+    if (!config.booking_available) error("location-message", "New bookings are not available yet. You can still view your existing rides and receipts.");
     $("card-option").disabled = !config.card_payments;
     $("card-option").textContent = config.card_payments
       ? "Card"

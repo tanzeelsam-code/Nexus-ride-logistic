@@ -26,6 +26,7 @@ const { createMaps, bookingFingerprint, unavailable } = require('./services/maps
 const { createJobs } = require('./services/jobs.cjs');
 const { createPayments } = require('./services/payments.cjs');
 const { createNotifications } = require('./services/notifications.cjs');
+const { registerRecovery } = require('./services/recovery.cjs');
 
 // ============================================================
 // CONFIGURATION
@@ -510,9 +511,9 @@ async function revokeRefreshTokenSession(jti) {
 async function issueAuthTokens(user) {
   const accessJti = uuidv4();
   const refreshJti = uuidv4();
-  const token = app.jwt.sign({ id: user.id, role: user.role, jti: accessJti });
+  const token = app.jwt.sign({ id: user.id, role: user.role, ver: user.auth_version || 0, jti: accessJti });
   const refreshToken = app.jwt.sign(
-    { id: user.id, type: 'refresh', jti: refreshJti },
+    { id: user.id, type: 'refresh', ver: user.auth_version || 0, jti: refreshJti },
     { expiresIn: config.jwt.refreshExpiresIn }
   );
   await persistRefreshTokenSession({ jti: refreshJti, userId: user.id, role: user.role });
@@ -598,20 +599,13 @@ const authenticate = async (req, reply) => {
       return reply.code(401).send({ error: 'Token revoked' });
     }
     
-    // Load user from cache or DB
-    const cacheKey = `user:${req.user.id}`;
-    let user = await Cache.get(cacheKey);
-    
-    if (!user) {
-      const { rows } = await query(
-        'SELECT id, role, email, phone, first_name, last_name, is_active, is_banned FROM users WHERE id = $1',
-        [req.user.id]
-      );
-      if (!rows[0]) return reply.code(401).send({ error: 'User not found' });
-      user = rows[0];
-      await Cache.set(cacheKey, user, 300);
-    }
-    
+    // Read current security state: password recovery and suspension revoke access immediately.
+    const { rows: [user] } = await query(
+      'SELECT id,role,email,phone,first_name,last_name,is_active,is_banned,auth_version FROM users WHERE id=$1',
+      [req.user.id]
+    );
+    if (!user || (req.user.ver || 0) !== user.auth_version) return reply.code(401).send({ error: 'Session expired. Please sign in again.' });
+
     if (!user.is_active || user.is_banned) {
       return reply.code(403).send({ error: 'Account suspended' });
     }
@@ -702,6 +696,10 @@ app.addHook('onRequest', (req, reply, done) => {
 });
 
 app.addHook('onSend', async (req, reply, payload) => {
+  reply.header('x-content-type-options', 'nosniff');
+  reply.header('referrer-policy', 'no-referrer');
+  reply.header('x-frame-options', 'DENY');
+  if (req.url.startsWith('/api/')) reply.header('cache-control', 'no-store');
   const context = req.idempotency;
   if (!context || !context.ownsLock || context.replayed) return payload;
 
@@ -750,7 +748,7 @@ app.addHook('onResponse', (req, reply, done) => {
   logger.info({
     requestId: req.requestId,
     method: req.method,
-    url: req.url,
+    url: req.url.split('?')[0],
     statusCode: reply.statusCode,
     duration,
     ip: req.ip
@@ -925,10 +923,10 @@ const schemas = {
   requestRide: z.object({
     pickup_lat: z.number().min(-90).max(90),
     pickup_lng: z.number().min(-180).max(180),
-    pickup_address: z.string().min(1),
+    pickup_address: z.string().min(1).max(500),
     dropoff_lat: z.number().min(-90).max(90),
     dropoff_lng: z.number().min(-180).max(180),
-    dropoff_address: z.string().min(1),
+    dropoff_address: z.string().min(1).max(500),
     service_type: z.enum(['taxi', 'freight', 'medical', 'airport', 'courier', 'cold_chain']).default('taxi'),
     vehicle_type: z.enum(VEHICLE_TYPES).optional(),
     payment_method: z.enum(['card', 'cash']).default('cash'),
@@ -942,20 +940,20 @@ const schemas = {
   requestDelivery: z.object({
     pickup_lat: z.number().min(-90).max(90),
     pickup_lng: z.number().min(-180).max(180),
-    pickup_address: z.string().min(1),
-    pickup_contact_name: z.string().min(1),
-    pickup_contact_phone: z.string().min(1),
+    pickup_address: z.string().min(1).max(500),
+    pickup_contact_name: z.string().trim().min(1).max(100),
+    pickup_contact_phone: z.string().min(8).max(20),
     dropoff_lat: z.number().min(-90).max(90),
     dropoff_lng: z.number().min(-180).max(180),
-    dropoff_address: z.string().min(1),
-    dropoff_contact_name: z.string().min(1),
-    dropoff_contact_phone: z.string().min(1),
-    cargo_description: z.string().min(1),
-    cargo_weight_kg: z.number().positive(),
-    cargo_length_cm: z.number().optional(),
-    cargo_width_cm: z.number().optional(),
-    cargo_height_cm: z.number().optional(),
-    cargo_value: z.number().optional(),
+    dropoff_address: z.string().min(1).max(500),
+    dropoff_contact_name: z.string().trim().min(1).max(100),
+    dropoff_contact_phone: z.string().min(8).max(20),
+    cargo_description: z.string().trim().min(1).max(500),
+    cargo_weight_kg: z.number().positive().max(10000),
+    cargo_length_cm: z.number().nonnegative().max(1000000).optional(),
+    cargo_width_cm: z.number().nonnegative().max(1000000).optional(),
+    cargo_height_cm: z.number().nonnegative().max(1000000).optional(),
+    cargo_value: z.number().nonnegative().max(1000000).optional(),
     is_fragile: z.boolean().default(false),
     requires_refrigeration: z.boolean().default(false),
     temp_min_celsius: z.number().optional(),
@@ -963,6 +961,8 @@ const schemas = {
     insurance_requested: z.boolean().default(false),
     pickup_window_start: z.string().datetime().optional(),
     pickup_window_end: z.string().datetime().optional(),
+    payment_method: z.literal('cash').default('cash'),
+    quote_token: z.string().max(150000).optional(),
   }),
 
   b2bQuote: z.object({
@@ -974,7 +974,7 @@ const schemas = {
     cargo_volume_m3: z.number().positive().optional().default(0.2),
     service_type: z.enum(['courier', 'standard_parcel', 'bulk_freight', 'cold_chain', 'oversized', 'express_same_day']).default('standard_parcel'),
     requires_refrigeration: z.boolean().default(false),
-    cargo_value: z.number().optional().default(0),
+    cargo_value: z.number().nonnegative().max(1000000).optional().default(0),
     insurance_requested: z.boolean().default(false),
   }),
 
@@ -1156,7 +1156,7 @@ app.post('/api/v1/auth/login', { preHandler: requireDatabase, config: { rateLimi
   }
   
   const { rows: [user] } = await query(
-    'SELECT id, email, phone, first_name, last_name, role, password_hash, is_active, is_banned FROM users WHERE email = $1',
+    'SELECT id, email, phone, first_name, last_name, role, password_hash, is_active, is_banned, auth_version FROM users WHERE email = $1',
     [body.email]
   );
   
@@ -1241,7 +1241,7 @@ app.post('/api/v1/auth/refresh', { config: { rateLimit: { max: 20, timeWindow: '
   }
 
   const { rows: [user] } = await query(
-    'SELECT id, role, email, first_name, last_name, is_active, is_banned FROM users WHERE id = $1',
+    'SELECT id, role, email, first_name, last_name, is_active, is_banned, auth_version FROM users WHERE id = $1',
     [decoded.id]
   );
 
@@ -1253,6 +1253,15 @@ app.post('/api/v1/auth/refresh', { config: { rateLimit: { max: 20, timeWindow: '
     await kv.del(refreshKey);
     return reply.code(403).send({ error: 'Account suspended' });
   }
+
+  if ((decoded.ver || 0) !== user.auth_version) {
+    await kv.del(refreshKey);
+    return reply.code(401).send({ error: 'Session expired. Please sign in again.' });
+  }
+
+  // Atomically claim the refresh credential before issuing another session.
+  const claimed = await kv.set(`refresh-used:${decoded.jti}`, '1', 'EX', refreshTokenTtlSeconds, 'NX');
+  if (!claimed) return reply.code(401).send({ error: 'Refresh token already used' });
 
   // Rotate refresh token to prevent replay.
   await revokeRefreshTokenSession(decoded.jti);
@@ -1519,6 +1528,7 @@ async function driverTripAction(driver, tripId, action, body = {}) {
 
   if (action === 'complete') {
     if (trip.status !== 'in_progress') return bad();
+    if (trip.payment_method === 'cash' && body.cash_collected !== true) return { code: 400, body: { error: 'Confirm cash collection before completing this ride.' } };
     const fare = Number(trip.total_fare) + Number(trip.tips || 0);
     const platformFee = Number((fare * PLATFORM_FEE_RATE).toFixed(2));
     const driverEarnings = Number((fare - platformFee).toFixed(2));
@@ -1896,6 +1906,8 @@ async function driverDeliveryAction(driver, deliveryId, action, body = {}) {
 
     const pod = schemas.proofOfDelivery.safeParse(body);
     if (!pod.success) return { code: 400, body: { error: 'Invalid proof of delivery', details: pod.error.issues.map(i => i.message) } };
+    if (d.payment_method === 'cash' && body.cash_collected !== true) return { code: 400, body: { error: 'Confirm cash collection before completing this delivery.' } };
+    if (!pod.data.recipient_name || !pod.data.pod_signature) return { code: 400, body: { error: 'Recipient name and signature are required.' } };
     const podSignature = pod.data.pod_signature || null;
     const podPhotoUrl = pod.data.pod_photo_url || null;
     const podRecipientName = pod.data.recipient_name || d.dropoff_contact_name || 'Recipient';
@@ -1909,10 +1921,15 @@ async function driverDeliveryAction(driver, deliveryId, action, body = {}) {
           driver_earnings = $2,
           dropoff_signature_url = COALESCE($4, dropoff_signature_url),
           dropoff_photo_url = COALESCE($5, dropoff_photo_url),
-          dropoff_recipient_name = $6
+          dropoff_recipient_name = $6,
+          payment_status = CASE WHEN payment_method='cash' THEN 'captured'::payment_status ELSE payment_status END
         WHERE id = $3 AND status IN ('in_transit','out_for_delivery')
       `, [platformFee, driverEarnings, d.id, podSignature, podPhotoUrl, podRecipientName]);
       if (rowCount !== 1) return false;
+      if (d.payment_method === 'cash') await client.query(`
+        INSERT INTO payments(payment_ref,delivery_id,customer_id,amount,currency,method,status,gateway,captured_at)
+        VALUES($1,$2,$3,$4,$5,'cash','captured','cash',NOW())`,
+        [`PAY-${d.delivery_number}`,d.id,d.customer_id,fare,d.currency]);
       await client.query(`
         UPDATE drivers SET total_trips = total_trips + 1, completed_trips = completed_trips + 1,
           total_earnings = total_earnings + $1, status = 'available'
@@ -1946,8 +1963,57 @@ async function driverDeliveryAction(driver, deliveryId, action, body = {}) {
   return { code: 400, body: { error: 'Unknown action' } };
 }
 
+function validateDeliveryAvailability(body) {
+  if (body.pickup_window_start || body.pickup_window_end) throw unavailable('Scheduled deliveries are not available yet. Request when your package is ready.', 400);
+  if (isProduction && body.insurance_requested) throw unavailable('Shipment insurance is not available. Please arrange cover separately.', 400);
+  if (body.requires_refrigeration && (!Number.isFinite(body.temp_min_celsius) || !Number.isFinite(body.temp_max_celsius) || body.temp_min_celsius >= body.temp_max_celsius)) throw unavailable('Choose a valid minimum and maximum cargo temperature.', 400);
+}
+function deliveryFingerprint(body) {
+  return requestBodyHash({ ...body, quote_token: undefined });
+}
+async function deliveryPrice(body) {
+  const pricing = await AI.price({ ...body, service_type: deliveryServiceType(body) });
+  const insurancePremium = body.insurance_requested && body.cargo_value ? round2(body.cargo_value * 0.015) : 0;
+  return { ...pricing, insurance_premium: insurancePremium, total_fare: round2(Number(pricing.total_fare) + insurancePremium) };
+}
+app.post('/api/v1/deliveries/estimate', { preHandler: [authenticate, requireRole('customer')] }, async req => {
+  const body = validate(schemas.requestDelivery, req.body);
+  validateDeliveryAvailability(body);
+  const pricing = await deliveryPrice(body);
+  const quote_token = app.jwt.sign({ type: 'delivery_quote', fingerprint: deliveryFingerprint(body), pricing }, { expiresIn: '5m' });
+  return { price_estimate: pricing, quote_token, expires_at: new Date(Date.now()+300000).toISOString() };
+});
+app.get('/api/v1/deliveries', { preHandler: [authenticate, requireDatabase, requireRole('customer')] }, async req => {
+  const { rows } = await query(`SELECT id,delivery_number,status,pickup_address,dropoff_address,total_fare,currency,
+    payment_method,payment_status,tracking_url,requested_at,delivered_at,dropoff_recipient_name,
+    pickup_otp,dropoff_otp FROM deliveries WHERE customer_id=$1 ORDER BY requested_at DESC LIMIT 50`, [req.user.id]);
+  return { deliveries: rows };
+});
+
+function deliveryCreatedResponse(delivery) {
+  return { delivery: {
+    id: delivery.id, delivery_number: delivery.delivery_number, status: delivery.status,
+    tracking_url: delivery.tracking_url, total_fare: delivery.total_fare,
+    insurance_premium: Number(delivery.insurance_premium), pickup_otp: delivery.pickup_otp, dropoff_otp: delivery.dropoff_otp,
+  }, message: 'Delivery requested. Follow its status in your delivery history.' };
+}
+
 app.post('/api/v1/deliveries', { preHandler: [authenticate, requireDatabase, idempotencyGuard] }, async (req, reply) => {
   const body = validate(schemas.requestDelivery, req.body);
+  if (req.user.role !== 'customer') return reply.code(403).send({ error: 'Customer account required' });
+  const requestKey = req.idempotency ? requestBodyHash(req.idempotency.key) : null;
+  const fingerprint = requestBodyHash(body);
+  async function replayExisting() {
+    if (!requestKey) return null;
+    const { rows: [existing] } = await query('SELECT * FROM deliveries WHERE customer_id=$1 AND request_key=$2', [req.user.id,requestKey]);
+    if (!existing) return null;
+    if (existing.request_fingerprint !== fingerprint) throw unavailable('Idempotency key already used with different payload',409);
+    reply.header('x-idempotent-replay','true');
+    return existing;
+  }
+  const existing = await replayExisting();
+  if (existing) return reply.code(201).send(deliveryCreatedResponse(existing));
+  validateDeliveryAvailability(body);
   const deliveryId = uuidv4();
   const deliveryNumber = `DEL-${Date.now()}-${randomDigits(3)}`;
 
@@ -1958,25 +2024,19 @@ app.post('/api/v1/deliveries', { preHandler: [authenticate, requireDatabase, ide
   // Unguessable public tracking slug
   const trackingSlug = crypto.randomBytes(12).toString('hex');
 
-  // Calculate insurance premium
-  let insurancePremium = 0;
-  if (body.insurance_requested && body.cargo_value) {
-    insurancePremium = Number((body.cargo_value * 0.015).toFixed(2)); // 1.5% of declared value
-  }
+  let pricing;
+  if (body.quote_token) {
+    let quote;
+    try { quote = app.jwt.verify(body.quote_token); } catch { throw unavailable('Your quote expired. Please check the fare again.', 400); }
+    if (quote.type !== 'delivery_quote' || quote.fingerprint !== deliveryFingerprint(body) || !quote.pricing) throw unavailable('Delivery details changed. Please check the fare again.', 400);
+    pricing = quote.pricing;
+  } else pricing = await deliveryPrice(body);
+  const insurancePremium = pricing.insurance_premium;
+  const totalFare = pricing.total_fare;
 
-  const serviceType = deliveryServiceType(body);
-  const pricing = await AI.price({
-    pickup_lat: body.pickup_lat,
-    pickup_lng: body.pickup_lng,
-    dropoff_lat: body.dropoff_lat,
-    dropoff_lng: body.dropoff_lng,
-    service_type: serviceType,
-    cargo_weight_kg: body.cargo_weight_kg,
-    requires_refrigeration: body.requires_refrigeration,
-  });
-  const totalFare = round2(Number(pricing.total_fare) + insurancePremium);
-
-  const { rows: [delivery] } = await query(`
+  let delivery;
+  try {
+  ({ rows: [delivery] } = await query(`
     INSERT INTO deliveries (
       id, delivery_number, customer_id,
       pickup_contact_name, pickup_contact_phone, pickup_lat, pickup_lng, pickup_address,
@@ -1987,10 +2047,10 @@ app.post('/api/v1/deliveries', { preHandler: [authenticate, requireDatabase, ide
       cargo_value, is_fragile, requires_refrigeration, temp_min_celsius, temp_max_celsius,
       insurance_requested, insurance_premium,
       base_fare, distance_fare, cold_chain_surcharge,
-      total_fare, currency, status
+      total_fare, currency, status, payment_method, request_key, request_fingerprint
     ) VALUES (
       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
-      $18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36
+      $18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39
     )
     RETURNING *
   `, [
@@ -2003,26 +2063,21 @@ app.post('/api/v1/deliveries', { preHandler: [authenticate, requireDatabase, ide
     body.cargo_value ?? null, body.is_fragile, body.requires_refrigeration, body.temp_min_celsius ?? null, body.temp_max_celsius ?? null,
     body.insurance_requested, insurancePremium,
     pricing.breakdown?.base_fare ?? null, pricing.breakdown?.distance_fare ?? null, pricing.breakdown?.cold_chain_surcharge ?? null,
-    totalFare, 'USD', 'pending'
-  ]);
+    totalFare, pricing.currency || 'USD', 'pending', 'cash', requestKey, fingerprint
+  ]));
+  } catch (error) {
+    if (error.code === '23505') {
+      const saved = await replayExisting();
+      if (saved) return reply.code(201).send(deliveryCreatedResponse(saved));
+    }
+    throw error;
+  }
 
   await dispatchDelivery(delivery.id);
 
   logger.info({ deliveryId, customerId: req.user.id }, 'Delivery request created');
 
-  return reply.code(201).send({
-    delivery: {
-      id: delivery.id,
-      delivery_number: delivery.delivery_number,
-      status: delivery.status,
-      tracking_url: delivery.tracking_url,
-      total_fare: delivery.total_fare,
-      insurance_premium: insurancePremium,
-      pickup_otp: pickupOtp,     // Customer gives this to the driver at pickup
-      dropoff_otp: dropoffOtp,   // Customer shares this with the receiver, who gives it to the driver
-    },
-    message: 'Delivery scheduled. Driver will be assigned shortly.'
-  });
+  return reply.code(201).send(deliveryCreatedResponse(delivery));
 });
 
 
@@ -2569,12 +2624,12 @@ app.get('/api/v1/driver/earnings', { preHandler: [authenticate, requireDatabase,
 app.get('/api/v1/driver/jobs/current', { preHandler: [authenticate, requireDatabase, requireDriver] }, async (req, reply) => {
   if (runtime.edge) await sweepDispatch();
   const { rows: trips } = await query(`
-    SELECT id, trip_number, status, pickup_address, pickup_lat, pickup_lng, dropoff_address, dropoff_lat, dropoff_lng, total_fare, driver_assigned_at
+    SELECT id, trip_number, status, pickup_address, pickup_lat, pickup_lng, dropoff_address, dropoff_lat, dropoff_lng, total_fare, currency, payment_method, driver_assigned_at
     FROM trips WHERE driver_id = $1 AND status IN ('accepted','driver_en_route','arrived','in_progress')
   `, [req.driver.id]);
   const { rows: deliveries } = await query(`
     SELECT id, delivery_number, status, pickup_address, pickup_lat, pickup_lng, dropoff_address, dropoff_lat, dropoff_lng,
-           cargo_description, cargo_weight_kg, total_fare
+           cargo_description, cargo_weight_kg, total_fare, currency, payment_method
     FROM deliveries WHERE driver_id = $1 AND status IN ('pending','pickup_scheduled','in_transit','out_for_delivery')
   `, [req.driver.id]);
   return reply.send({ trips, deliveries, driver: { status:req.driver.status, is_online:req.driver.is_online, onboarding_completed:req.driver.onboarding_completed }, respond_within_sec: driverResponseTimeoutMs / 1000 });
@@ -3038,6 +3093,12 @@ const io = runtime.io || new SocketIO({
   },
 });
 
+registerRecovery({ app, query, transaction, bcrypt, validate, requireDatabase, dummyHash: DUMMY_BCRYPT_HASH,
+  onRecovered: async userId => {
+    await Cache.del(`user:${userId}`);
+    if (!runtime.edge) io.in(`user:${userId}`).disconnectSockets(true);
+  } });
+
 const payments = createPayments({ app, query, transaction, stripe, jobs, enabled: cardsEnabled,
   publicKey: getEnv('STRIPE_PUBLISHABLE_KEY', ''), appUrl: getEnv('PUBLIC_APP_URL', '').replace(/\/$/, ''),
   connectCountry: getEnv('STRIPE_CONNECT_COUNTRY', ''), authenticate, requireDatabase, requireDriver, idempotencyGuard, readQuote });
@@ -3056,7 +3117,7 @@ async function processBackground(limit = 10) {
   }, limit);
   await payments.sweep(limit);
 }
-app.get('/api/v1/config', async () => ({ maps: maps.enabled, card_payments: cardsEnabled,
+app.get('/api/v1/config', async () => ({ maps: maps.enabled, booking_available: !isProduction || maps.enabled, account_recovery: 'offline_code', card_payments: cardsEnabled,
   stripe_publishable_key: cardsEnabled ? getEnv('STRIPE_PUBLISHABLE_KEY', '') : null,
   push_notifications: notifications.enabled, vapid_public_key: notifications.enabled ? getEnv('VAPID_PUBLIC_KEY', '') : null }));
 app.get('/api/v1/places/search', { preHandler: [authenticate], config: { rateLimit: { max: 20, timeWindow: 60000 } } }, async req => {
@@ -3069,10 +3130,13 @@ app.get('/api/v1/places/reverse', { preHandler: [authenticate] }, async req => {
   return { place: await maps.reverse(body.lat,body.lng) };
 });
 
-function verifyAccessToken(token) {
+async function verifyAccessToken(token) {
   const decoded = app.jwt.verify(token);
-  if (decoded.type) throw new Error('refresh token is not an access token');
-  return decoded;
+  if (decoded.type) throw new Error('not an access token');
+  if (await kv.get(`blacklist:${decoded.jti}`)) throw new Error('revoked');
+  const { rows: [user] } = await query('SELECT role,auth_version,is_active,is_banned FROM users WHERE id=$1',[decoded.id]);
+  if (!user?.is_active || user.is_banned || (decoded.ver || 0) !== user.auth_version) throw new Error('revoked');
+  return { ...decoded, role: user.role };
 }
 
 io.on('connection', (socket) => {
@@ -3082,8 +3146,11 @@ io.on('connection', (socket) => {
   socket.on('ops:join', async (payload) => {
     try {
       if (opsAuthRequired || payload?.token) {
-        const decoded = verifyAccessToken(payload?.token || '');
+        const decoded = await verifyAccessToken(payload?.token || '');
         if (!['admin', 'ops'].includes(decoded.role)) throw new Error('forbidden');
+        socket.userId = decoded.id;
+        socket.accessToken = payload.token;
+        socket.join(`user:${decoded.id}`);
       }
       socket.join('ops:alerts');
       socket.join('ops:fleet');
@@ -3100,10 +3167,11 @@ io.on('connection', (socket) => {
 
   socket.on('auth', async ({ token } = {}) => {
     try {
-      const decoded = verifyAccessToken(token);
+      const decoded = await verifyAccessToken(token);
       if (await kv.get(`blacklist:${decoded.jti}`)) throw new Error('revoked');
       socket.userId = decoded.id;
       socket.role = decoded.role;
+      socket.accessToken = token;
 
       socket.join(`user:${decoded.id}`);
 
@@ -3127,6 +3195,7 @@ io.on('connection', (socket) => {
       const reply = (r) => { if (typeof ack === 'function') ack(r); };
       if (socket.role !== 'driver' || !socket.driverId) return reply({ code: 403, body: { error: 'Driver only' } });
       try {
+        try { await verifyAccessToken(socket.accessToken); } catch { return reply({ code: 401, body: { error: 'Please sign in again' } }); }
         const driver = await getDriverByUserId(socket.userId);
         reply(await driverTripAction(driver, payload.tripId, action, payload));
       } catch (err) {
@@ -3144,6 +3213,7 @@ io.on('connection', (socket) => {
   socket.on('sos', async ({ tripId, lat, lng } = {}) => {
     if (!socket.userId || !UUID_RE.test(String(tripId))) return;
     try {
+      await verifyAccessToken(socket.accessToken);
       const { rows: [trip] } = await query(`
         SELECT id, customer_id, driver_id FROM trips
         WHERE id = $1 AND (customer_id = $2 OR driver_id IN (SELECT id FROM drivers WHERE user_id = $2))
@@ -3241,7 +3311,7 @@ async function probeDatabase() {
   }
 }
 
-// Create or reset the admin account from ADMIN_EMAIL / ADMIN_PASSWORD. No default admin exists.
+// Bootstrap only: restarts must never undo password recovery or reactivate suspended accounts.
 async function bootstrapAdmin() {
   const email = getEnv('ADMIN_EMAIL', '').toLowerCase();
   const password = getEnv('ADMIN_PASSWORD', '');
@@ -3252,7 +3322,7 @@ async function bootstrapAdmin() {
   await db.query(`
     INSERT INTO users (role, email, phone, first_name, last_name, password_hash, salt, is_verified, email_verified, referral_code)
     VALUES ('admin', $1, $2, 'System', 'Administrator', $3, '', TRUE, TRUE, $4)
-    ON CONFLICT (email) DO UPDATE SET role = 'admin', password_hash = EXCLUDED.password_hash, is_active = TRUE, is_banned = FALSE
+    ON CONFLICT (email) DO NOTHING
   `, [email, `+0${Date.now()}`.slice(0, 20), passwordHash, `ADM${randomDigits(6)}`]);
   logger.info({ email }, '✅ Admin account ensured');
 }
@@ -3267,7 +3337,9 @@ async function start() {
       dbConnected = true;
       logger.info('✅ Database connected');
       await ensureOperationalTables();
-      await db.query(fs.readFileSync(path.join(__dirname,'supabase/migrations/20261019085513_booking_payments_notifications.sql'),'utf8'));
+      for (const migration of ['20261019085513_booking_payments_notifications.sql','20261024093153_release_recovery_cash_billing.sql','20261024093804_durable_delivery_requests.sql']) {
+        await db.query(fs.readFileSync(path.join(__dirname,'supabase/migrations',migration),'utf8'));
+      }
       logger.info('✅ Operational tables ensured');
       await bootstrapAdmin();
     } catch (e) {

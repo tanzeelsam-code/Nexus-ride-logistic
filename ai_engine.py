@@ -920,7 +920,7 @@ async def estimate_price(req: PriceRequest):
 @app.post("/safety/analyze")
 async def analyze_safety(req: SafetyCheckRequest):
     """Analyze real-time trip safety telemetry"""
-    result = await nexora_core.analyze_trip_safety(req.trip_id, req.dict())
+    result = await nexora_core.analyze_trip_safety(req.trip_id, req.model_dump())
     return result
 
 
@@ -946,7 +946,7 @@ async def support_chat(req: SupportRequest):
 @app.post("/fraud/check")
 async def fraud_check(req: FraudCheckRequest):
     """Real-time fraud detection for payment"""
-    result = await nexora_core.check_fraud(req.dict())
+    result = await nexora_core.check_fraud(req.model_dump())
     return result
 
 

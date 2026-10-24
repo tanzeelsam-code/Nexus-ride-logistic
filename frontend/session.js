@@ -12,7 +12,7 @@
     function clear() {
       generation++;
       refreshPromise = null;
-      ["token", "refresh", "name", "trip", "pending_booking"].forEach((k) =>
+      ["token", "refresh", "name", "trip", "pending_booking", "pending_delivery"].forEach((k) =>
         set(k, null),
       );
     }

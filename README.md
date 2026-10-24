@@ -148,12 +148,16 @@ Webhooks are signature-verified and queued durably; a failed handler can be retr
 
 Push notifications require explicit browser opt-in and HTTPS (localhost works for development). They use encrypted payloads, provider endpoint validation, short expiry for job offers, and automatic removal of expired subscriptions. They contain no addresses or pickup PINs. Sign-out unsubscribes the device. Browsers without Web Push continue using on-screen polling. Drivers must keep the portal open to send current location; a web page cannot guarantee background GPS.
 
+## Account recovery
+
+Open `/account-recovery.html` while you know your current password and generate a single-use offline recovery code. Save it privately; only its SHA-256 hash is stored. A new code replaces the old one. Reset requires the saved code and a new password of 12–72 UTF-8 bytes; successful reset atomically consumes the code, increments the account session version and removes push subscriptions. Access tokens, refresh tokens and Node socket sessions are revoked. There is no email reset provider configured; users without a code and without their current password cannot self-recover. Admin bootstrap only creates missing accounts and never resets credentials on restart.
+
 ## Remaining product limits
 
 - **No trained-model claims.** Untrained architectures live in `ai/research_models.py` and are never imported by the serving runtime. Dispatch uses proximity, pricing uses published rates with neutral surge, and demand forecasts explicitly report unavailable. Real trip history, training and independent evaluation are still required before introducing learned models.
-- **Freight billing remains separate.** The new card capture/Connect settlement flow covers rides. Freight earnings are recorded, but uncollected freight fares are not added to electronic payouts; freight invoicing/collection still needs its own workflow.
+- **Freight uses cash on delivery.** Customers review a signed, five-minute quote before booking. Drivers confirm cash collection, recipient name and signature; completion writes one receipt atomically. Database-backed request identities prevent duplicate deliveries if the response cache is lost. Card capture/Connect settlement covers rides only. Cash earnings are never sent again as electronic payouts. Operators reconcile the platform commission collected by cash drivers manually. Legacy deliveries with no payment method require operations reconciliation.
 - **Integration activation needs real credentials.** Automated payment tests use a fake Stripe provider and real isolated PostgreSQL/Redis. They do not certify live card processing, bank payouts, Mapbox account permissions or push delivery on physical devices.
-- **Mobile and operations.** The Android APK is a WebView wrapper. SMS, background GPS, driver document uploads, account recovery and scheduled rides are not implemented. Scheduled booking requests are rejected explicitly. Legacy `ride.html` and `freight.html` dashboards still contain sample presentation content; use the live customer, driver and operations portals.
+- **Mobile and operations.** The Android APK is a WebView wrapper. SMS, background GPS, driver document uploads and scheduled bookings are not implemented. Scheduled requests are rejected explicitly. `ride.html` redirects to the customer portal; `freight.html` is the real delivery portal. Shipment insurance is unavailable in production until an actual insurance arrangement is implemented.
 - **Launch validation.** Run a Stripe sandbox/SCA test, physical-device push test, and a supervised field pilot before public launch. Cloudflare supplies HTTPS; standalone Docker deployments still require a TLS terminator.
 
 Additional regression checks:
@@ -172,7 +176,18 @@ npm run deploy:check            # Worker packaging; does not deploy
 Start at https://nexora-ride-logistic.tanzeelsam.workers.dev/ and choose a role.
 
 - **Customer:** Open `/customer.html`, expand **Create a customer account**, register, and request a ride. Search and select pickup/destination addresses, or place pins on the map. Review the fare before confirming. Pay with cash or an enabled card integration. Follow the driver on the map and share the pickup PIN only when the correct driver arrives.
+- **Delivery:** Sign in at `/freight.html` with your customer account. Select both addresses, enter sender/recipient contacts and package details, review the fare, and confirm. The recipient pays cash at delivery. Your delivery history contains tracking links, handoff PINs and paid receipts.
 - **Driver:** Register at `/driver-register.html`, including your vehicle. Sign in at `/driver.html`. An administrator must approve your registration before **Go online** works. Allow location access so dispatch can find you near a pickup. Accept an offer, mark arrival, enter the rider's pickup PIN, and complete the ride. Delivery jobs also support pickup/drop-off PINs and proof of delivery.
 - **Admin:** Sign in at `/admin.html` with the local credentials in `.env.nexora-admin`. Review pending drivers and choose **Approve driver**. Open the operations dashboard at `/ops.html` for fleet and dispatch information. Public registration creates customer or driver accounts, never admin accounts.
 
 To try all roles yourself, use separate browser profiles or tabs and different customer/driver email addresses and phone numbers. Register the driver, approve them as admin, and put them online near your customer pickup before requesting a ride. With no nearby available driver, the request fails after the dispatch timeout.
+
+## Release deployment (2026-10-24)
+
+Apply pending additive migrations before deploying the Worker. The backend role must retain its server-only RLS policies and sequence privileges. Back up the schema and migration history before changing the production database. Never run `scripts/e2e.js` against production: the Node-mode test deliberately resets active jobs in its isolated database.
+
+Node 22.23.4 or 24.22.1+ within the supported major is required; `.nvmrc`, CI and containers use 22.23.4. Wrangler's transitive Undici is pinned to patched 7.30.1 until its upstream pin is updated. Run `npm audit` and the Python dependency audit again before each release.
+
+The public config reports `booking_available`, `card_payments`, `push_notifications` and the recovery method. With no maps token, production booking fails closed and the customer portals explain that new bookings are unavailable. A configured token must still pass real geocoding and road-route checks. Do not enable cards until credentials, webhook delivery, Connect onboarding and sandbox SCA/capture/refund handling have been verified.
+
+Before opening paid bookings: confirm the launch country, currency, service area, published fare rates, legal business/support contact, privacy/terms, driver screening and a supervised field pilot. These operator decisions are not inferred from the development environment.

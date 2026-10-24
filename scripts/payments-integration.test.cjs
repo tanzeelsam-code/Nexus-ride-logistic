@@ -29,6 +29,7 @@ test(
         "utf8",
       ),
     );
+    await db.query(fs.readFileSync("supabase/migrations/20261024093153_release_recovery_cash_billing.sql", "utf8"));
     const intents = new Map(),
       transfers = [];
     let captures = 0,

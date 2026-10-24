@@ -207,3 +207,9 @@ select:focus-visible {
     font-size: 34px;
   }
 }
+
+.freight-layout { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.freight-layout .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.freight-layout input[type="checkbox"] { width: auto; margin-right: 8px; }
+#recovery-code { font-family: monospace; }
+@media (max-width: 780px) { .freight-layout, .freight-layout .grid { grid-template-columns: 1fr; } .freight-layout { gap: 0; } }

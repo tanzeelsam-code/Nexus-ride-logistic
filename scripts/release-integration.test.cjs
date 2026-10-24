@@ -1,0 +1,76 @@
+'use strict';
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const crypto = require('node:crypto');
+const { Pool } = require('pg');
+const Redis = require('ioredis');
+const { createBackend } = require('../backend_api.js');
+
+test('recovery revokes sessions; freight quotes, receipts and ownership survive retries',
+  { skip: process.env.NEXORA_TEST_DATABASE !== 'isolated', timeout: 120000 }, async t => {
+    const db = new Pool({host:'127.0.0.1',port:Number(process.env.TEST_DB_PORT||55439),user:'nexus',database:'nexusdb',password:process.env.TEST_DB_PASSWORD||'nexora_isolated_test'});
+    const redis = new Redis({host:'127.0.0.1',port:Number(process.env.TEST_REDIS_PORT||56389),password:process.env.TEST_REDIS_PASSWORD||'nexora_isolated_test'});
+    for(const name of ['20261019085513_booking_payments_notifications.sql','20261024093153_release_recovery_cash_billing.sql','20261024093804_durable_delivery_requests.sql']) await db.query(fs.readFileSync('supabase/migrations/'+name,'utf8'));
+    const backend = createBackend({edge:true,db,redis,rateLimit:async()=>{},io:{on(){},to(){return{emit(){}}}},env:{NODE_ENV:'development',LOG_LEVEL:'silent',JWT_SECRET:'isolated-test-secret-at-least-32-characters'}});
+    await backend.initialize();
+    t.after(async()=>{await backend.app.close(); await redis.quit(); await db.end();});
+    async function call(method,path,body,token,headers={}) {
+      const r=await backend.app.inject({method,url:'/api/v1'+path,payload:body,headers:{...(token?{authorization:'Bearer '+token}:{}),...headers}});
+      return {status:r.statusCode,body:r.json(),headers:r.headers};
+    }
+    const suffix=crypto.randomBytes(8).toString('hex');
+    const credentials={email:`release-${suffix}@nexora.test`,password:'Release-test-password-123'};
+    let r=await call('POST','/auth/register',{...credentials,phone:'+1555'+crypto.randomInt(1e9).toString().padStart(9,'0'),first_name:'Release',last_name:'Test'});
+    assert.equal(r.status,201); const original=r.body;
+    const make=()=>call('POST','/auth/recovery-code',credentials);
+    r=await call('POST','/auth/recovery-code',{...credentials,password:'incorrect'}); assert.equal(r.status,401);
+    const old=(await make()).body.recovery_code;
+    r=await make(); assert.equal(r.status,200); assert.equal(r.headers['cache-control'],'no-store'); const code=r.body.recovery_code;
+    const stored=(await db.query('SELECT recovery_code_hash FROM users WHERE id=$1',[original.user.id])).rows[0];
+    assert.notEqual(stored.recovery_code_hash,code); assert.equal(stored.recovery_code_hash.length,64);
+    const recover=c=>call('POST','/auth/recover',{email:credentials.email,recovery_code:c,new_password:'New-release-password-123'});
+    assert.equal((await recover(old)).status,400);
+    const concurrent=await Promise.all([recover(code),recover(code)]);
+    assert.deepEqual(concurrent.map(r=>r.status).sort(),[200,400]);
+    assert.equal((await call('GET','/trips',undefined,original.token)).status,401);
+    assert.equal((await call('POST','/auth/refresh',{refresh_token:original.refresh_token})).status,401);
+    assert.equal((await call('POST','/auth/login',credentials)).status,401);
+    r=await call('POST','/auth/login',{...credentials,password:'New-release-password-123'}); assert.equal(r.status,200); const token=r.body.token;
+    const refresh=await Promise.all([1,2].map(()=>call('POST','/auth/refresh',{refresh_token:r.body.refresh_token})));
+    assert.deepEqual(refresh.map(r=>r.status).sort(),[200,401]);
+    const body={pickup_lat:40.75,pickup_lng:-73.98,pickup_address:'Warehouse',pickup_contact_name:'Sender',pickup_contact_phone:'+15550000001',dropoff_lat:40.76,dropoff_lng:-73.99,dropoff_address:'Office',dropoff_contact_name:'Receiver',dropoff_contact_phone:'+15550000002',cargo_description:'Books',cargo_weight_kg:2};
+    r=await call('POST','/deliveries/estimate',body,token); assert.equal(r.status,200); const quote=r.body;
+    assert.equal((await call('GET','/deliveries',undefined,quote.quote_token)).status,401);
+    assert.equal((await call('POST','/deliveries',{...body,cargo_weight_kg:3,quote_token:quote.quote_token},token)).status,400);
+    assert.equal((await call('POST','/deliveries',{...body,pickup_window_start:new Date().toISOString()},token)).status,400);
+    const headers={'idempotency-key':crypto.randomUUID()};
+    const create=()=>call('POST','/deliveries',{...body,quote_token:quote.quote_token},token,headers);
+    r=await create(); assert.equal(r.status,201); const delivery=r.body.delivery;
+    assert.equal(Number(delivery.total_fare),quote.price_estimate.total_fare);
+    assert.equal((await create()).body.delivery.id,delivery.id);
+    // Lose the response cache after committing the booking: the DB request identity still prevents duplicates.
+    await redis.del(`idem:${original.user.id}:POST:/api/v1/deliveries:${headers['idempotency-key']}`);
+    const recovered=await create(); assert.equal(recovered.status,201); assert.equal(recovered.body.delivery.id,delivery.id);
+    await redis.del(`idem:${original.user.id}:POST:/api/v1/deliveries:${headers['idempotency-key']}`);
+    const changed=await call('POST','/deliveries',{...body,cargo_description:'Different goods',quote_token:quote.quote_token},token,headers);
+    assert.equal(changed.status,409);
+    const rows=(await call('GET','/deliveries',undefined,token)).body.deliveries;
+    assert.equal(rows.filter(d=>d.id===delivery.id).length,1);
+    assert.equal(rows[0].payment_method,'cash');
+    assert.equal((await call('GET','/deliveries',undefined)).status,401);
+    // Payment writes run through the actual driver transition and transaction.
+    const driverResult=await call('POST','/drivers/register',{email:`driver-${suffix}@nexora.test`,password:credentials.password,phone:'+1555'+crypto.randomInt(1e9).toString().padStart(9,'0'),first_name:'Release',last_name:'Driver',mode:'freight',vehicle:{plate_number:suffix,make:'Test',model:'Van',year:2025,color:'White',vehicle_type:'van'}});
+    assert.equal(driverResult.status,201,JSON.stringify(driverResult.body));
+    const driver=driverResult.body;
+    await db.query("UPDATE deliveries SET driver_id=$1,status='in_transit' WHERE id=$2",[driver.driver.id,delivery.id]);
+    const signature='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    const proof={otp:delivery.dropoff_otp,recipient_name:'Receiver',pod_signature:signature};
+    const deliver=body=>call('POST',`/driver/deliveries/${delivery.id}/deliver`,body,driver.token);
+    assert.equal((await deliver(proof)).status,400);
+    assert.equal((await deliver({...proof,cash_collected:true})).status,200);
+    assert.equal((await deliver({...proof,cash_collected:true})).status,409);
+    const receipt=(await db.query('SELECT amount,status FROM payments WHERE delivery_id=$1',[delivery.id])).rows;
+    assert.equal(receipt.length,1); assert.equal(receipt[0].status,'captured'); assert.equal(Number(receipt[0].amount),quote.price_estimate.total_fare);
+    assert.equal((await call('GET','/deliveries',undefined,driver.token)).status,403);
+  });

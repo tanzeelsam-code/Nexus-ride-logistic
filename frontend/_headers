@@ -1,0 +1,8 @@
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  X-Frame-Options: DENY
+  Permissions-Policy: geolocation=(self), camera=(), microphone=()
+  Strict-Transport-Security: max-age=31536000
+/account-recovery.html
+  Cache-Control: no-store

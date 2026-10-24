@@ -17,6 +17,10 @@ node --check frontend/admin.js
 node --check frontend/ops.js
 node --check frontend/tracking.js
 node --check frontend/customer.js
+node --check frontend/freight.js
+node --check frontend/availability.js
+node --check frontend/account-recovery.js
+node --check services/recovery.cjs
 node --check frontend/session.js
 node --check frontend/notifications.js
 node --check frontend/sw.js

@@ -272,7 +272,7 @@ async function run() {
   check('correct OTP starts the trip', r.status === 200 && r.body.status === 'in_progress', r);
   r = await post(`/trips/${trip.id}/cancel`, {}, { token: custToken });
   check('cannot cancel a trip in progress (400)', r.status === 400, r);
-  r = await post(`/driver/trips/${trip.id}/complete`, { actual_distance_km: 21.4 }, { token: drvAToken });
+  r = await post(`/driver/trips/${trip.id}/complete`, { actual_distance_km: 21.4, cash_collected: true }, { token: drvAToken });
   check('driver completes; 80/20 split computed', r.status === 200 && r.body.status === 'completed' && Math.abs(r.body.driver_earnings + r.body.platform_fee - r.body.fare) < 0.011 && r.body.platform_fee > 0, r.body);
 
   r = await post(`/trips/${trip.id}/rate`, { rating: 7 }, { token: custToken });
@@ -372,7 +372,7 @@ async function run() {
   r = await post(`/driver/deliveries/${del.id}/deliver`, { otp: del.dropoff_otp, pod_signature: 'javascript:alert(1)' }, { token: drvAToken });
   check('a signature that is not a PNG data URL is rejected (400)', r.status === 400, r);
   const signaturePng = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
-  r = await post(`/driver/deliveries/${del.id}/deliver`, { otp: del.dropoff_otp, recipient_name: 'Dana Reyes', pod_signature: signaturePng }, { token: drvAToken });
+  r = await post(`/driver/deliveries/${del.id}/deliver`, { otp: del.dropoff_otp, recipient_name: 'Dana Reyes', pod_signature: signaturePng, cash_collected: true }, { token: drvAToken });
   check('delivery is completed with earnings and proof of delivery', r.status === 200 && r.body.status === 'delivered' && r.body.driver_earnings > 0 && r.body.pod.signature_captured && r.body.pod.recipient_name === 'Dana Reyes', r);
   r = await get(`/track/${slug}`);
   check('public tracking shows delivery with signature captured, without exposing it', r.body.delivery.status === 'delivered' && r.body.delivery.signature_captured === true && !JSON.stringify(r.body).includes('base64'), r.body.delivery);
@@ -493,10 +493,10 @@ async function run() {
   check('driver socket receives the new trip request', offer && offer.trip_id === liveTrip.id, offer);
   const ack = (ev, payload) => new Promise((resolve) => drvSock.emit(ev, payload, resolve));
   check('socket accept goes through the state machine', (await ack('trip:accept', { tripId: liveTrip.id })).code === 200);
-  check('socket cannot skip straight to complete', (await ack('trip:complete', { tripId: liveTrip.id })).code === 409);
+  check('socket cannot skip straight to complete', (await ack('trip:complete', { cash_collected: true, tripId: liveTrip.id })).code === 409);
   await ack('trip:arrive', { tripId: liveTrip.id });
   await ack('trip:start', { tripId: liveTrip.id, otp: liveTrip.pickup_otp });
-  await ack('trip:complete', { tripId: liveTrip.id, actual_distance_km: 20 });
+  await ack('trip:complete', { cash_collected: true, tripId: liveTrip.id, actual_distance_km: 20 });
   await sleep(500);
   check('rider receives the full event sequence', ['trip:driver_offered', 'trip:driver_en_route', 'trip:driver_arrived', 'trip:started', 'trip:completed'].every((e) => events.includes(e)), events);
   rider.close();

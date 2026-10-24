@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Account recovery · Nexora</title>
+  <link rel="stylesheet" href="/portal.css"><link rel="stylesheet" href="/customer.css">
+  <script defer src="/account-recovery.js"></script>
+</head>
+<body><main>
+  <nav aria-label="Main navigation"><a href="/">nexora</a><a href="/customer.html">Your rides</a><a href="/freight.html">Deliveries</a><a href="/driver.html">For drivers</a></nav>
+  <div class="page-intro"><span class="eyebrow">Your account</span><h1>A way back in.</h1><p>Save a recovery code while you can sign in. If you forget your password, use the code once to regain access.</p></div>
+  <div class="freight-layout">
+    <form id="create-code" class="card">
+      <h2>Save a recovery code</h2><p>Use your current password to create or replace your code. Keep it in your password manager or another private place. Anyone with it can reset your password.</p>
+      <label>Email<input name="email" type="email" autocomplete="username" required maxlength="254"></label>
+      <label>Current password<input name="password" type="password" autocomplete="current-password" required maxlength="72"></label>
+      <button>Create recovery code</button><p id="create-status" role="status"></p>
+      <div id="code-result" hidden><label>Your single-use code<input id="recovery-code" readonly spellcheck="false" autocomplete="off"></label><p>This replaces any earlier code. It stays valid until used or replaced. We cannot show it again.</p><button id="copy-code" type="button" class="secondary">Copy code</button><button id="hide-code" type="button" class="secondary">I have saved it</button></div>
+    </form>
+    <form id="recover" class="card">
+      <h2>Reset your password</h2><p>Enter the recovery code you saved. Resetting your password signs out your previous sessions and removes their notification subscriptions.</p>
+      <label>Email<input name="email" type="email" autocomplete="username" required maxlength="254"></label>
+      <label>Recovery code<input name="recovery_code" required minlength="43" maxlength="43" autocomplete="off" spellcheck="false"></label>
+      <label>New password (12–72 characters)<input name="new_password" type="password" autocomplete="new-password" required minlength="12" maxlength="72"></label>
+      <label>Confirm new password<input name="confirm_password" type="password" autocomplete="new-password" required minlength="12" maxlength="72"></label>
+      <button>Reset password</button><p id="recover-status" role="status"></p>
+      <p>Without a saved code or your current password, self-service recovery is unavailable. Email recovery is not enabled.</p>
+    </form>
+  </div>
+</main></body></html>

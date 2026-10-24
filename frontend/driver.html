@@ -189,7 +189,7 @@
             <canvas id="sig-pad"></canvas>
           </div>
         </div>
-        <div class="error-text" id="pod-error"></div>
+        <label id="pod-cash-row" hidden><input id="pod-cash" type="checkbox"><span id="pod-cash-label"></span></label><div class="error-text" id="pod-error"></div>
 
         <div class="btn-row">
           <button class="btn-action btn-secondary" onclick="closePodModal()">
@@ -510,7 +510,7 @@
         const buttons = actions
           .map(
             ([action, label], i) =>
-              `<button class="btn-action ${i > 0 ? "btn-secondary" : ""}" data-kind="${kind}" data-id="${esc(job.id)}" data-action="${action}">${esc(label)}</button>`,
+              `<button class="btn-action ${i > 0 ? "btn-secondary" : ""}" data-kind="${kind}" data-id="${esc(job.id)}" data-action="${action}" data-cash="${job.payment_method === "cash"}" data-fare="${esc(money(job.total_fare))}">${esc(label)}</button>`,
           )
           .join("");
         return `
@@ -559,10 +559,14 @@
         const btn = e.target.closest("button[data-action]");
         if (!btn) return;
         const { kind, id, action } = btn.dataset;
-        if (action === "pod") return openPodModal(id);
+        if (action === "pod") return openPodModal(id, btn.dataset.cash === "true", btn.dataset.fare);
 
         $("status-error").textContent = "";
         const body = {};
+        if (action === "complete" && btn.dataset.cash === "true") {
+          if (!confirm(`Have you collected ${btn.dataset.fare} in cash from the rider?`)) return;
+          body.cash_collected = true;
+        }
         if (action === "pickup" || action === "start") {
           const otp = prompt(
             action === "pickup"
@@ -636,7 +640,10 @@
       canvas.addEventListener("touchmove", draw, { passive: false });
       window.addEventListener("touchend", stopDraw);
 
-      function openPodModal(deliveryId) {
+      function openPodModal(deliveryId, isCash, fare) {
+        $("pod-cash-row").hidden = !isCash;
+        $("pod-cash").checked = false;
+        $("pod-cash-label").textContent = `I collected ${fare} in cash from the recipient`;
         podDeliveryId = deliveryId;
         $("pod-otp").value = "";
         $("pod-recipient").value = "";
@@ -653,6 +660,10 @@
       }
 
       async function submitPod() {
+        if (!$("pod-cash-row").hidden && !$("pod-cash").checked) {
+          $("pod-error").textContent = "Collect the delivery fee and confirm cash collection.";
+          return;
+        }
         const otp = $("pod-otp").value.trim();
         const recipient = $("pod-recipient").value.trim();
         if (!/^\d{6}$/.test(otp)) {
@@ -677,6 +688,7 @@
               body: JSON.stringify({
                 otp,
                 recipient_name: recipient,
+                cash_collected: $("pod-cash").checked,
                 pod_signature: canvas.toDataURL("image/png"),
               }),
             },
@@ -731,5 +743,5 @@
         showView("login");
       })();
     </script>
-  </body>
+  <p style="text-align:center"><a href="/account-recovery.html">Account recovery</a></p></body>
 </html>
